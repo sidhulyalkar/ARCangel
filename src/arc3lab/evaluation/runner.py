@@ -26,6 +26,11 @@ def _error_result(game_id: str, exc: BaseException) -> dict[str, Any]:
         "level_events": [],
         "model_calls": 0,
         "model_failures": 0,
+        "reasoning_cycles": 0,
+        "tool_calls": 0,
+        "tool_failures": 0,
+        "queued_actions_used": 0,
+        "fallback_actions": 0,
         "deadline_exhausted": False,
         "error": f"{type(exc).__name__}: {exc}"[:1000],
     }
@@ -43,7 +48,7 @@ def run_game(
 ) -> dict[str, Any]:
     """Run one environment without mutating shared GameAction enum state.
 
-    max_actions is a *safety ceiling*, not the primary budget. On Kaggle the shared
+    max_actions is a safety ceiling, not the primary budget. On Kaggle the shared
     wall-clock deadline should be the primary limiter because valid ARC3 levels can
     naturally require hundreds of actions.
     """
@@ -69,8 +74,6 @@ def run_game(
         if state == "GAME_OVER":
             if resets >= max_resets:
                 break
-            # Record the losing transition before retrying. In competition mode RESET
-            # restarts the current level, so retain the game's learned mechanics/memory.
             try:
                 policy.observe(frame)
             except Exception:
@@ -86,13 +89,10 @@ def run_game(
         before_level = int(getattr(frame, "levels_completed", 0))
         spec = policy.choose(scene)
         if spec.action_id not in scene.available_actions:
-            # Never burn a scored action on an illegal model output.
             legal = next((a for a in scene.available_actions if a != 0), 0)
             spec = ActionSpec(legal, reason="illegal-output guard", confidence=0.0)
 
         action = GameAction.from_id(spec.action_id)
-        # GameAction enum members carry mutable action_data. Calling set_data() can race
-        # across concurrent games for ACTION6. Pass thread-local data directly instead.
         frame = env.step(
             action,
             data=spec.data,
@@ -106,7 +106,6 @@ def run_game(
             )
             level_start_actions = actions
 
-    # Observe terminal/latest frame once so the final transition is not lost.
     try:
         policy.observe(frame)
     except Exception:
@@ -122,6 +121,12 @@ def run_game(
         "level_events": events,
         "model_calls": int(getattr(policy, "model_calls", 0)),
         "model_failures": int(getattr(policy, "model_failures", 0)),
+        "reasoning_cycles": int(getattr(policy, "reasoning_cycles", 0)),
+        "tool_calls": int(getattr(policy, "tool_calls", 0)),
+        "tool_failures": int(getattr(policy, "tool_failures", 0)),
+        "queued_actions_used": int(getattr(policy, "queued_actions_used", 0)),
+        "fallback_actions": int(getattr(policy, "fallback_actions", 0)),
+        "belief_count": len(getattr(policy, "beliefs", [])),
         "deadline_exhausted": deadline_exhausted,
         "error": None,
     }
@@ -177,7 +182,7 @@ def run_suite(
                 max_resets=max_resets,
                 stop_at_monotonic=stop_at,
             )
-        except BaseException as exc:  # submission robustness: preserve other games
+        except BaseException as exc:
             return _error_result(game_id, exc)
 
     try:
@@ -203,7 +208,6 @@ def run_suite(
                     except BaseException as exc:
                         results.append(_error_result(gid, exc))
     finally:
-        # Closing the single scorecard is more important than propagating one game error.
         try:
             scorecard = arc.close_scorecard(card_id)
         except Exception as exc:
@@ -219,6 +223,11 @@ def run_suite(
             "deadline_exhausted_games": sum(bool(x.get("deadline_exhausted")) for x in results),
             "model_calls": sum(int(x.get("model_calls", 0)) for x in results),
             "model_failures": sum(int(x.get("model_failures", 0)) for x in results),
+            "reasoning_cycles": sum(int(x.get("reasoning_cycles", 0)) for x in results),
+            "tool_calls": sum(int(x.get("tool_calls", 0)) for x in results),
+            "tool_failures": sum(int(x.get("tool_failures", 0)) for x in results),
+            "queued_actions_used": sum(int(x.get("queued_actions_used", 0)) for x in results),
+            "fallback_actions": sum(int(x.get("fallback_actions", 0)) for x in results),
         },
     }
     if output_path:
