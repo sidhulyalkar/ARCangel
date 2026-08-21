@@ -18,13 +18,13 @@ class HybridPolicy(StructuralPolicy):
         model: ModelAdapter | None = None,
         *args: Any,
         model_every: int = 1,
-        max_model_calls: int = 96,
+        max_model_calls: int | None = 96,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.model = model
         self.model_every = max(1, model_every)
-        self.max_model_calls = max(0, max_model_calls)
+        self.max_model_calls = None if max_model_calls is None else max(0, max_model_calls)
         self.model_calls = 0
         self.model_failures = 0
         self.action_queue: list[ActionSpec] = []
@@ -59,8 +59,11 @@ class HybridPolicy(StructuralPolicy):
             return ActionSpec(6, x=x, y=y, reason=reason, confidence=confidence)
         return ActionSpec(aid, reason=reason, confidence=confidence)
 
+    def _model_budget_available(self) -> bool:
+        return self.max_model_calls is None or self.model_calls < self.max_model_calls
+
     def _model_actions(self, scene: Scene) -> list[ActionSpec]:
-        if self.model is None or self.model_calls >= self.max_model_calls:
+        if self.model is None or not self._model_budget_available():
             return []
         should_ask = self.step <= 6 or self.stuck > 0 or self.step % self.model_every == 0
         if not should_ask:
