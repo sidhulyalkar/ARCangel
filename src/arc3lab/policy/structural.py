@@ -29,6 +29,7 @@ class StructuralPolicy:
         self.last_action: ActionSpec | None = None
         self.last_target_shape: str | None = None
         self.probed_simple: dict[int, set[int]] = defaultdict(set)
+        self.probed_simple_global: set[int] = set()
         self.target_trials: Counter[tuple[int, str]] = Counter()
         self.coord_trials: Counter[tuple[str, int, int]] = Counter()
         self.stuck = 0
@@ -67,7 +68,6 @@ class StructuralPolicy:
             self.graph.add(t)
             self.stuck = 0 if d["meaningful_changed_cells"] or level_up else self.stuck + 1
             if level_up:
-                self.probed_simple[scene.level].clear()
                 self.stuck = 0
         self.grids.append(grid)
         self.scenes.append(scene)
@@ -110,20 +110,27 @@ class StructuralPolicy:
 
     def choose(self, scene: Scene) -> ActionSpec:
         valid = set(scene.available_actions)
+        # Learn primitive action semantics aggressively in the first level. Later
+        # weighted levels inherit that evidence instead of blindly re-probing every action.
         simple = [a for a in (1, 2, 3, 4, 5, 7) if a in valid]
-        unprobed = [a for a in simple if a not in self.probed_simple[scene.level]]
+        unprobed = [a for a in simple if a not in self.probed_simple_global] if scene.level == 0 else []
         if unprobed:
             order = {1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 7: 5}
             a = min(unprobed, key=lambda x: order[x])
             self.probed_simple[scene.level].add(a)
-            spec = ActionSpec(a, reason="first action-effect probe", confidence=0.45)
+            self.probed_simple_global.add(a)
+            spec = ActionSpec(a, reason="first-level action-effect probe", confidence=0.45)
             self.last_action, self.last_target_shape = spec, None
             return spec
 
         click = self._best_click(scene)
         if click is not None:
             spec, shape = click
-            if (spec.y is not None and spec.x is not None and self.coord_trials[(scene.signature, spec.y, spec.x)] == 0) or not simple:
+            if (
+                spec.y is not None
+                and spec.x is not None
+                and self.coord_trials[(scene.signature, spec.y, spec.x)] == 0
+            ) or not simple:
                 self.target_trials[(scene.level, shape)] += 1
                 if spec.y is not None and spec.x is not None:
                     self.coord_trials[(scene.signature, spec.y, spec.x)] += 1
