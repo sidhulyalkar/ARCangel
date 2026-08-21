@@ -45,12 +45,14 @@ def run_game(
     max_actions: int = 1200,
     max_resets: int = 0,
     stop_at_monotonic: float | None = None,
+    game_time_budget_seconds: float | None = None,
 ) -> dict[str, Any]:
     """Run one environment without mutating shared GameAction enum state.
 
     max_actions is a safety ceiling, not the primary budget. On Kaggle the shared
     wall-clock deadline should be the primary limiter because valid ARC3 levels can
-    naturally require hundreds of actions.
+    naturally require hundreds of actions. game_time_budget_seconds begins when this
+    worker actually starts the game, so queued jobs do not lose their per-game budget.
     """
     from arcengine import GameAction
 
@@ -62,9 +64,19 @@ def run_game(
     level_start_actions = 0
     events: list[dict[str, Any]] = []
     deadline_exhausted = False
+    game_started_mono = time.monotonic()
+    game_stop_at = (
+        game_started_mono + game_time_budget_seconds
+        if game_time_budget_seconds is not None
+        else None
+    )
 
     while actions < max_actions:
-        if stop_at_monotonic is not None and time.monotonic() >= stop_at_monotonic:
+        now = time.monotonic()
+        if stop_at_monotonic is not None and now >= stop_at_monotonic:
+            deadline_exhausted = True
+            break
+        if game_stop_at is not None and now >= game_stop_at:
             deadline_exhausted = True
             break
 
@@ -127,6 +139,7 @@ def run_game(
         "queued_actions_used": int(getattr(policy, "queued_actions_used", 0)),
         "fallback_actions": int(getattr(policy, "fallback_actions", 0)),
         "belief_count": len(getattr(policy, "beliefs", [])),
+        "elapsed_seconds": round(time.monotonic() - game_started_mono, 3),
         "deadline_exhausted": deadline_exhausted,
         "error": None,
     }
@@ -142,8 +155,9 @@ def run_suite(
     tags: list[str] | None = None,
     output_path: str | Path | None = None,
     time_budget_seconds: float | None = None,
+    game_time_budget_seconds: float | None = None,
 ) -> dict[str, Any]:
-    """Run a scorecard with fail-soft per-game execution and a shared deadline."""
+    """Run a scorecard with fail-soft execution and a continuous worker queue."""
     from arc_agi import Arcade
 
     arc = Arcade()
@@ -172,6 +186,12 @@ def run_suite(
     scorecard = None
 
     def safe_one(game_id: str) -> dict[str, Any]:
+        if stop_at is not None and time.monotonic() >= stop_at:
+            return {
+                **_error_result(game_id, TimeoutError("shared deadline reached before start")),
+                "state": "SKIPPED_DEADLINE",
+                "deadline_exhausted": True,
+            }
         try:
             return run_game(
                 arc,
@@ -181,6 +201,7 @@ def run_suite(
                 max_actions=max_actions,
                 max_resets=max_resets,
                 stop_at_monotonic=stop_at,
+                game_time_budget_seconds=game_time_budget_seconds,
             )
         except BaseException as exc:
             return _error_result(game_id, exc)
@@ -199,6 +220,9 @@ def run_suite(
                     continue
                 results.append(safe_one(game_id))
         else:
+            # ThreadPoolExecutor maintains one continuous queue: whenever a game ends,
+            # that worker immediately takes the next unstarted game. This avoids fixed
+            # waves while preserving the one-make-per-environment competition contract.
             with ThreadPoolExecutor(max_workers=workers) as ex:
                 futs = {ex.submit(safe_one, gid): gid for gid in selected}
                 for fut in as_completed(futs):
