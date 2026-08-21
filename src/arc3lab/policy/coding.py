@@ -32,13 +32,13 @@ class CodingPolicy(HybridPolicy):
         model: ModelAdapter | None = None,
         *args: Any,
         reasoning_interval: int = 2,
-        max_model_calls: int = 96,
-        max_tool_calls: int = 36,
+        max_model_calls: int | None = 96,
+        max_tool_calls: int | None = 36,
         **kwargs: Any,
     ) -> None:
         super().__init__(model=model, *args, max_model_calls=max_model_calls, **kwargs)
         self.reasoning_interval = max(1, reasoning_interval)
-        self.max_tool_calls = max(0, max_tool_calls)
+        self.max_tool_calls = None if max_tool_calls is None else max(0, max_tool_calls)
         self.tool_calls = 0
         self.tool_failures = 0
         self.reasoning_cycles = 0
@@ -52,6 +52,7 @@ class CodingPolicy(HybridPolicy):
 
     def on_level_reset(self) -> None:
         super().on_level_reset()
+        # Preserve verified history/beliefs but force a fresh decision after a failed attempt.
         self.last_reason_step = -10_000
 
     def observe(self, frame: Any) -> Scene:
@@ -74,6 +75,7 @@ class CodingPolicy(HybridPolicy):
         note = " ".join(str(note).split())[:500]
         if not note or confidence < 0.62:
             return
+        # Deduplicate near-identical notes without deleting the underlying lossless ledger.
         if any(note.lower() == str(x.get("note", "")).lower() for x in self.beliefs[-16:]):
             return
         self.beliefs.append(
@@ -92,6 +94,7 @@ class CodingPolicy(HybridPolicy):
         out: list[dict[str, Any]] = []
         for t in self.memory.transitions:
             d = asdict(t)
+            # Keep a flat, coding-agent-friendly action representation.
             d["action"] = asdict(t.action)
             out.append(d)
         return out
@@ -170,23 +173,21 @@ class CodingPolicy(HybridPolicy):
             "diff_frames": diff_frames,
         }
 
+    def _tool_budget_available(self) -> bool:
+        return self.max_tool_calls is None or self.tool_calls < self.max_tool_calls
+
     def _should_reason(self, scene: Scene) -> bool:
-        if self.model is None or self.model_calls >= self.max_model_calls:
+        if self.model is None or not self._model_budget_available():
             return False
         if scene.level != self.last_reason_level:
             return True
         if self.stuck > 0:
             return True
-        if self.step <= 8:
-            return True
-        if scene.level >= 1:
-            interval = 1
-        elif self.step >= 400:
-            interval = max(8, self.reasoning_interval * 4)
-        elif self.step >= 150:
-            interval = max(4, self.reasoning_interval * 2)
-        else:
-            interval = self.reasoning_interval
+        # RHAE charges every environment action, including failed attempts and post-reset
+        # retries, to the level where it happened. Level 0 is therefore the cheapest place
+        # to identify mechanics. Once the game advances, prefer transferred beliefs and
+        # reliable queued plans, re-reasoning mainly when the state is novel or the plan fails.
+        interval = 1 if scene.level == 0 else max(2, self.reasoning_interval)
         return self.step - self.last_reason_step >= interval
 
     def _parse_actions(self, parsed: dict[str, Any], scene: Scene) -> list[ActionSpec]:
@@ -219,7 +220,7 @@ class CodingPolicy(HybridPolicy):
         return out
 
     def _call_model(self, user: str, scene: Scene) -> dict[str, Any] | None:
-        if self.model is None or self.model_calls >= self.max_model_calls:
+        if self.model is None or not self._model_budget_available():
             return None
         try:
             self.model_calls += 1
@@ -250,8 +251,8 @@ class CodingPolicy(HybridPolicy):
         if (
             isinstance(program, str)
             and program.strip()
-            and self.tool_calls < self.max_tool_calls
-            and self.model_calls < self.max_model_calls
+            and self._tool_budget_available()
+            and self._model_budget_available()
         ):
             self.tool_calls += 1
             try:
