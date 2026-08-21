@@ -68,11 +68,19 @@ class OpenAICompatLocalAdapter(ModelAdapter):
         base_url: str = "http://127.0.0.1:8000/v1",
         max_tokens: int = 512,
         timeout: float = 120.0,
+        temperature: float = 0.0,
+        top_p: float = 1.0,
+        top_k: int | None = None,
+        enable_thinking: bool = False,
     ) -> None:
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.max_tokens = max_tokens
         self.timeout = timeout
+        self.temperature = float(temperature)
+        self.top_p = float(top_p)
+        self.top_k = int(top_k) if top_k is not None else None
+        self.enable_thinking = bool(enable_thinking)
 
     def complete(self, system: str, user: str, grid: Any | None = None) -> str:
         import base64
@@ -109,11 +117,15 @@ class OpenAICompatLocalAdapter(ModelAdapter):
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_content},
             ],
-            "temperature": 0,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
             "max_tokens": self.max_tokens,
         }
+        if self.top_k is not None:
+            payload["top_k"] = self.top_k
+        if self.enable_thinking:
+            payload["chat_template_kwargs"] = {"enable_thinking": True}
         r = requests.post(f"{self.base_url}/chat/completions", json=payload, timeout=self.timeout)
-        # If a text-only model rejects image content, retry with the same structured text.
         if not r.ok and grid is not None:
             payload["messages"][1]["content"] = user
             r = requests.post(f"{self.base_url}/chat/completions", json=payload, timeout=self.timeout)
