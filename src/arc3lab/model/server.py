@@ -61,6 +61,7 @@ def launch_vllm(
         "--gpu-memory-utilization",
         str(gpu_memory_utilization),
         "--trust-remote-code",
+        "--enable-prefix-caching",
     ]
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, env=os.environ.copy())
     deadline = time.time() + timeout

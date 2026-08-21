@@ -93,7 +93,8 @@ class OpenAICompatLocalAdapter(ModelAdapter):
                 ], dtype=np.uint8)
                 arr = palette[np.asarray(grid, dtype=np.int64)]
                 img = Image.fromarray(arr, mode="RGB").resize((256, 256), Image.Resampling.NEAREST)
-                buf = io.BytesIO(); img.save(buf, format="PNG", optimize=True)
+                buf = io.BytesIO()
+                img.save(buf, format="PNG", optimize=True)
                 b64 = base64.b64encode(buf.getvalue()).decode("ascii")
                 user_content = [
                     {"type": "text", "text": user},

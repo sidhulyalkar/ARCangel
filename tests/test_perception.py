@@ -5,9 +5,12 @@ from arc3lab.perception.diffs import infer_hud_mask
 
 
 def test_components_and_shape_hash_translation_invariant():
-    a = np.zeros((8, 8), dtype=np.int8); a[1:3, 1:3] = 9
-    b = np.zeros((8, 8), dtype=np.int8); b[4:6, 5:7] = 9
-    ca = components(a, 0)[0]; cb = components(b, 0)[0]
+    a = np.zeros((8, 8), dtype=np.int8)
+    a[1:3, 1:3] = 9
+    b = np.zeros((8, 8), dtype=np.int8)
+    b[4:6, 5:7] = 9
+    ca = components(a, 0)[0]
+    cb = components(b, 0)[0]
     assert ca.shape_hash == cb.shape_hash
     assert ca.centroid != cb.centroid
 

@@ -4,9 +4,8 @@ import json
 from collections import Counter, defaultdict
 from dataclasses import asdict
 from pathlib import Path
-from typing import Iterable
 
-from arc3lab.types import ActionSpec, Transition
+from arc3lab.types import Transition
 
 
 class EpisodeMemory:

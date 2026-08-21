@@ -113,7 +113,25 @@ def make_hybrid(bundle: str) -> dict:
         ),
         code_cell(bootstrap_cell(bundle)),
         code_cell(
-            '''import os
+            '''import glob, os, pathlib, subprocess, sys
+
+# Public Duck-class Kaggle notebooks attach an offline vLLM wheelhouse. Install it
+# only when the base image does not already provide vLLM.
+try:
+    import vllm  # noqa: F401
+except Exception:
+    vllm_wheels = glob.glob("/kaggle/input/**/*vllm*.whl", recursive=True)
+    if not vllm_wheels:
+        raise RuntimeError(
+            "vLLM is not installed. Attach the public ARC3 vLLM wheelhouse dataset."
+        )
+    wheel = sorted(vllm_wheels)[-1]
+    wheel_dir = str(pathlib.Path(wheel).parent)
+    subprocess.check_call([
+        sys.executable, "-m", "pip", "install", "--quiet", "--no-index",
+        "--find-links", wheel_dir, wheel,
+    ])
+
 from arc3lab.model import OpenAICompatLocalAdapter, discover_model_path, launch_vllm
 
 MODEL_PATH = os.environ.get("ARC3_MODEL_PATH") or discover_model_path()

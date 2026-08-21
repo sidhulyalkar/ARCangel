@@ -35,6 +35,12 @@ class StructuralPolicy:
         self.level = 0
         self.step = 0
 
+    def on_level_reset(self) -> None:
+        """Preserve learned game mechanics while clearing transient action state."""
+        self.last_action = None
+        self.last_target_shape = None
+        self.stuck = 0
+
     def observe(self, frame: Any) -> Scene:
         grid = frame_grid(frame)
         future_grids = self.grids + [grid]

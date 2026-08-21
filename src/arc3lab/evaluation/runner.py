@@ -69,9 +69,17 @@ def run_game(
         if state == "GAME_OVER":
             if resets >= max_resets:
                 break
+            # Record the losing transition before retrying. In competition mode RESET
+            # restarts the current level, so retain the game's learned mechanics/memory.
+            try:
+                policy.observe(frame)
+            except Exception:
+                pass
             frame = env.step(GameAction.RESET, data={}, reasoning={"reason": "recover"})
             resets += 1
-            policy = policy_factory(game_id)
+            reset_hook = getattr(policy, "on_level_reset", None)
+            if callable(reset_hook):
+                reset_hook()
             continue
 
         scene = policy.observe(frame)
