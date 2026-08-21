@@ -120,16 +120,18 @@ def make_hybrid(bundle: str) -> dict:
 try:
     import vllm  # noqa: F401
 except Exception:
-    vllm_wheels = glob.glob("/kaggle/input/**/*vllm*.whl", recursive=True)
+    vllm_wheels = [
+        p for p in glob.glob("/kaggle/input/**/*.whl", recursive=True)
+        if pathlib.Path(p).name.lower().startswith("vllm-")
+    ]
     if not vllm_wheels:
         raise RuntimeError(
             "vLLM is not installed. Attach the public ARC3 vLLM wheelhouse dataset."
         )
-    wheel = sorted(vllm_wheels)[-1]
-    wheel_dir = str(pathlib.Path(wheel).parent)
+    wheel_dir = str(pathlib.Path(sorted(vllm_wheels)[-1]).parent)
     subprocess.check_call([
         sys.executable, "-m", "pip", "install", "--quiet", "--no-index",
-        "--find-links", wheel_dir, wheel,
+        "--find-links", wheel_dir, "vllm",
     ])
 
 from arc3lab.model import OpenAICompatLocalAdapter, discover_model_path, launch_vllm
