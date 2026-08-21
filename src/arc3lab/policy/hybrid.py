@@ -29,6 +29,10 @@ class HybridPolicy(StructuralPolicy):
         self.model_failures = 0
         self.action_queue: list[ActionSpec] = []
 
+    def on_level_reset(self) -> None:
+        super().on_level_reset()
+        self.action_queue.clear()
+
     def observe(self, frame: Any) -> Scene:
         before_level = self.level
         before_stuck = self.stuck

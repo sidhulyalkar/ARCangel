@@ -37,3 +37,17 @@ def test_hybrid_validates_action6_and_honors_model_budget():
     assert policy.model_calls == 1
     assert policy._model_actions(scene) == []
     assert model.calls == 1
+
+
+def test_level_reset_preserves_memory_and_clears_queue():
+    policy = HybridPolicy(model=None)
+    marker = object()
+    policy.memory.transitions.append(marker)  # type: ignore[arg-type]
+    policy.action_queue.append(policy._parse_one({"id": 1}, (1,), (8, 8), 1.0, "x"))  # type: ignore[arg-type]
+    policy.last_action = policy._parse_one({"id": 1}, (1,), (8, 8), 1.0, "x")
+    policy.stuck = 3
+    policy.on_level_reset()
+    assert policy.memory.transitions == [marker]
+    assert policy.action_queue == []
+    assert policy.last_action is None
+    assert policy.stuck == 0
