@@ -50,3 +50,17 @@ def test_coding_policy_tool_round_then_action():
     assert policy.tool_calls == 1
     assert model.calls == 2
     assert policy.beliefs
+
+
+def test_coding_policy_supports_uncapped_budgets():
+    policy = CodingPolicy(model=ToolThenActModel(), max_model_calls=None, max_tool_calls=None)
+    assert policy._model_budget_available()
+    assert policy._tool_budget_available()
+
+
+def test_later_level_does_not_force_simple_action_reprobe():
+    policy = CodingPolicy(model=None)
+    s = scene()
+    s.level = 1
+    action = policy.choose(s)
+    assert action.reason != "first-level action-effect probe"
