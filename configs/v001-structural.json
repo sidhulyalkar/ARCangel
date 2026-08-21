@@ -1,0 +1,9 @@
+{
+  "name": "v001-structural-calibration",
+  "policy": "structural",
+  "max_actions_per_game": 600,
+  "shared_time_budget_seconds": 3600,
+  "workers": 8,
+  "seed": 20260820,
+  "purpose": "fast leakage-resistant leaderboard calibration and telemetry"
+}

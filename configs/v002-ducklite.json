@@ -1,0 +1,13 @@
+{
+  "name": "v002-ducklite-qwen",
+  "policy": "hybrid",
+  "model_path_env": "ARC3_MODEL_PATH",
+  "model_every": 1,
+  "max_model_calls_per_game": 96,
+  "max_actions_per_game": 1200,
+  "shared_time_budget_seconds": 29400,
+  "workers": 6,
+  "max_tokens_per_model_call": 448,
+  "seed": 20260820,
+  "purpose": "model-first multimodal ARC3 policy with short legal action queues, lossless episode memory, deterministic fallback, and a shared Kaggle deadline"
+}

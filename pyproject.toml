@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arc3-frontier-lab"
+version = "0.1.0"
+description = "Instrumented ARC-AGI-3 research harness for exploration, memory, world-model induction, and Kaggle submissions"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.9"]
+model = ["torch>=2.5", "transformers>=4.51", "accelerate>=1.2", "pillow>=10", "requests>=2.32"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
