@@ -1,6 +1,6 @@
 # ARCangel Kaggle submission runbook
 
-This file is the release checklist for the post-D110/D210 submission ladder. Do not submit an older imported notebook just because its display title looks similar.
+This is the release checklist for the post-D110/D210 ladder. Never submit an older imported notebook merely because the title looks similar.
 
 ## Required Kaggle inputs
 
@@ -10,98 +10,65 @@ Attach exactly:
 2. **ARC3 vLLM H100 Wheelhouse V3**
 3. **vrfai Qwen3.6 27B FP8 HF Snapshot**
 
-Kaggle settings:
+Settings:
 
 - **Accelerator:** NVIDIA RTX PRO 6000
 - **Internet:** OFF
 
-The expected model dataset may mount under a hyphenated path such as `vrfai-qwen3-6-27b-fp8-hf-snapshot`. Final notebooks normalize punctuation and validate Qwen + 27B + FP8 + safetensors evidence instead of using the retired brittle `MODEL_SCORE < 45` detector.
+The intended model may mount at a hyphenated path such as `vrfai-qwen3-6-27b-fp8-hf-snapshot`. FINAL C normalizes punctuation and validates Qwen + 27B + FP8 + safetensors evidence. The retired `MODEL_SCORE < 45` detector must not appear anywhere in the imported notebook.
 
-## S115 FINAL — causal fallback
+## S115 FINAL C — causal fallback
 
-Build ID:
+Build ID: `S115-FINAL-20260822-C`
 
-```text
-S115-FINAL-20260822-A
-```
+Notebook SHA-256: `76bab67d0bd1d97ae5bd8336e1af2df994eaa8cf666f7f1d4b098be7ff2bb5b5`
 
-Notebook SHA-256:
-
-```text
-e585d9b0c3276e6525237da6b76f52be22c362bebbca4f62da54fc189c2ed9d5
-```
-
-Embedded source-bundle SHA-256:
-
-```text
-1479f99d16dd56a1fce56281d4c414af9b46ee9f74d2023be7a9edbeef6b857c
-```
-
-Primary hypothesis: D110R2's `EffectPosteriorPolicy` improves the V004/Qwen campaign while leaving the higher-level coding/model-serving shell unchanged.
+Primary hypothesis: D110R2's `EffectPosteriorPolicy` improves the V004/Qwen campaign while preserving the higher-level campaign shell.
 
 Recommended private-submission order: **first**.
 
-## S120 FINAL B — h2 predictive state
+## S120 FINAL C — h2 predictive state
 
-Build ID:
+Build ID: `S120-FINAL-20260822-C`
 
-```text
-S120-FINAL-20260822-B
-```
+Notebook SHA-256: `f5db889630e94b8629f216dbf83404d65d92cbae8ef3a93cf3a36a60e2c7392b`
 
-Notebook SHA-256:
+Primary hypothesis: add D210R2-promoted h2 predictive verification, persistent goal hypotheses, prediction-error queue invalidation, and actor-visible temporal memory while retaining S115's causal fallback.
 
-```text
-7d61317a407f2db18e6e117a12b78ca633040367a0c8a607567e489f5021baf6
-```
-
-Embedded source-bundle SHA-256:
-
-```text
-e77eac56a8a7f7a242c3a894e0166970609cf8e78fa5295b0f519a83aba664bb
-```
-
-Primary hypothesis: add D210R2-promoted h2 predictive-state verification, persistent goal hypotheses, prediction-error queue invalidation and actor-visible temporal memory while retaining S115's causal fallback.
-
-D210R2 research gate: **PASSED**.
-
-This B build embeds the same V005 source shape tracked by the active GitHub branch, including configurable `predictive_history_depth=2` and predictive-context coverage helpers.
+D210R2 architecture gate: **PASSED**.
 
 Recommended private-submission order: **second**.
 
 ## Save & Run acceptance criteria
 
-A development Save & Run is eligible to become a Kaggle competition submission only if all of the following are true:
+A saved version is eligible for competition submission only if all of the following are true:
 
-1. The first contract cell prints the exact `SUBMISSION_BUILD` above.
+1. The first execution cell prints the exact `ARCANGEL SUBMISSION BUILD` above.
 2. CUDA reports an RTX PRO 6000 with the expected large-memory device.
 3. `ARC TOOLKIT PASS` prints after the mounted ARC wheels install.
 4. Embedded ARCangel source imports successfully.
-5. `vLLM: 0.19.0` (or a deliberately reviewed compatible replacement) imports successfully from the offline wheelhouse.
-6. Model discovery prints `Top mounted HF candidates:` followed by the intended snapshot.
-7. The detector prints `MODEL INPUT PASS`.
-8. The local vLLM server starts and the real Qwen generation smoke succeeds.
-9. The dynamic public-game smoke completes without harness errors.
-10. The notebook ends with `SAVE/RUN VALIDATION PASS` and the same build ID.
+5. `VLLM PACKAGE PASS` prints after vLLM 0.19.0 (or a deliberately reviewed compatible replacement) is available.
+6. Model discovery prints `Top mounted HF candidates:` and identifies the intended snapshot.
+7. Model discovery prints `MODEL INPUT PASS: <same build id>`.
+8. The local server prints `VLLM SERVER PASS`.
+9. A real Qwen generation prints `FULL INFRASTRUCTURE PREFLIGHT PASS`.
+10. The dynamic public-game smoke completes without harness errors.
+11. The notebook ends with `SAVE/RUN VALIDATION PASS: <same build id>`.
 
-If the log contains:
-
-```text
-if MODEL_SCORE < 45
-```
-
-or fails with `Best mounted model does not look like Qwen3.6 27B FP8`, the wrong/old notebook revision was executed. Do not debug that obsolete detector; import the final artifact.
+If a log contains `if MODEL_SCORE < 45`, lacks a FINAL C build marker, or fails with `Best mounted model does not look like Qwen3.6 27B FP8`, the wrong artifact was imported. Delete that Kaggle notebook and import FINAL C fresh.
 
 ## Competition rerun behavior
 
-Save/validation mode must not open the hidden competition scorecard. Competition rerun mode should:
+Validation mode must not open the hidden competition scorecard. Competition rerun mode should:
 
 - open one scorecard;
 - call `make()` only once per environment;
 - use the continuous worker queue;
 - preserve per-game policy memory across level reset/retry;
 - use wall-clock budget as the primary campaign limiter;
-- emit a durable receipt with source/build information and diagnostics.
+- retain D110's effect-posterior fallback behavior;
+- for S120, use h2 predictive verification and cancel queued actions on high-confidence prediction contradiction;
+- emit a durable receipt carrying build/source/serving diagnostics.
 
 ## Interpretation discipline
 
@@ -110,8 +77,10 @@ Submit S115 and S120 as two separate hypotheses.
 - S110 → S115 asks whether the causal fallback transfers under Qwen.
 - S115 → S120 asks whether temporal predictive verification and persistent goal state transfer.
 
-Do not react to one leaderboard number by editing multiple unrelated mechanisms. Preserve the receipt, inspect actions/levels/model calls/prediction mismatches, and let the next change answer one question.
+Do not react to one leaderboard number by editing multiple unrelated mechanisms. Preserve each receipt and compare levels, actions, model calls, fallback use, prediction mismatches, goal hypotheses, and elapsed GPU time.
 
 ## Next version after S120
 
-S130 should be an **adaptive campaign allocator**, calibrated from real S115/S120 receipts. Candidate allocation signals include current level, recent progress velocity, goal confidence, predictive coverage/mismatch rate, controller availability, elapsed GPU time and model failure rate. The objective is expected marginal private score per GPU-second, not equal effort per game.
+S130 should be an **adaptive campaign allocator** calibrated from real S115/S120 receipts. Candidate signals include current level, recent progress velocity, goal confidence, predictive coverage/mismatch rate, controller availability, elapsed GPU time, and model failure rate. Optimize expected marginal private score per GPU-second rather than equal effort per game.
+
+See `docs/RELEASE_STATUS_2026-08-22.md` for the synchronized D110/D210 evidence and current roadmap.
