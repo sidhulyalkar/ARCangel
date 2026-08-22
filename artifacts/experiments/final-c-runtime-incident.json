@@ -1,0 +1,24 @@
+{
+  "schema": "arcangel-runtime-incident-v1",
+  "date": "2026-08-22",
+  "platform": "Kaggle RTX PRO 6000 Blackwell",
+  "affected_builds": [
+    "S115-FINAL-20260822-C",
+    "S120-FINAL-20260822-C"
+  ],
+  "passed_before_failure": [
+    "RTX PRO 6000 CUDA detection",
+    "ARC toolkit bootstrap",
+    "ARCangel embedded source import",
+    "vLLM 0.19.0 offline installation",
+    "Qwen 27B FP8 snapshot discovery"
+  ],
+  "root_cause": "/usr/bin/ld: cannot find -lcuda",
+  "component": "FlashInfer 0.6.6 SM120 JIT final host-link step",
+  "interpretation": "CUDA runtime healthy; build-time unversioned CUDA driver linker name missing from compiler search path",
+  "resolution_builds": [
+    "S115-FINAL-20260822-D",
+    "S120-FINAL-20260822-D"
+  ],
+  "resolution": "Resolve libcuda.so.1, create writable libcuda.so alias, export LIBRARY_PATH/LD_LIBRARY_PATH, configure writable FlashInfer JIT dirs, and require a real c++ -lcuda self-test before vLLM launch."
+}
