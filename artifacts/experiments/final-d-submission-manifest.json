@@ -1,0 +1,28 @@
+{
+  "schema": "arcangel-submission-manifest-v1",
+  "date": "2026-08-22",
+  "source_baseline": "4f58bde50ae3160b446a7c5748787d3b951af5ab",
+  "artifacts": [
+    {
+      "build": "S115-FINAL-20260822-D",
+      "sha256": "70fe1231a0255b5212c1a06e062c9b1f1ea49698534dc1e2bb95522f805bb939",
+      "hypothesis": "D110R2 effect-posterior fallback under the V004/Qwen campaign",
+      "order": 1
+    },
+    {
+      "build": "S120-FINAL-20260822-D",
+      "sha256": "37680f9fb261ffd6864bb69ef89331282d2b3916548dd54e03af1ccbac23d39d",
+      "hypothesis": "D210R2 h2 predictive verification plus persistent goals and prediction-error queue invalidation",
+      "order": 2
+    }
+  ],
+  "runtime_hardening": "dynamic libcuda linker alias and preflight for FlashInfer SM120 JIT",
+  "required_validation_markers": [
+    "MODEL INPUT PASS",
+    "CUDA DRIVER RUNTIME LOAD PASS",
+    "CUDA DRIVER LINKER PASS",
+    "VLLM SERVER PASS",
+    "FULL INFRASTRUCTURE PREFLIGHT PASS",
+    "SAVE/RUN VALIDATION PASS"
+  ]
+}
