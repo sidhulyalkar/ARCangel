@@ -1,0 +1,54 @@
+{
+  "schema": "arcangel-experiment-summary-v1",
+  "experiment": "D210R2 CPU Predictive State + Planner Lab",
+  "date": "2026-08-22",
+  "profile": "deep",
+  "public_games": 25,
+  "state_representation_mean_consistency": {
+    "visual": 0.7933370715090041,
+    "visual+stepmod2": 0.9347177133287294,
+    "visual+stepmod4": 0.9600485692211143,
+    "h1": 0.9592747969786793,
+    "h2": 0.9918345028317109,
+    "h3": 0.997865185863239,
+    "action-counts": 0.8929816541230903,
+    "h1+counts": 0.9973029171335048
+  },
+  "architecture_gate": {
+    "recommended_default_state_representation": "h2",
+    "consistency_target": 0.99,
+    "implement_temporal_state": true,
+    "implement_compiled_planner": true,
+    "implement_cross_level_semantics": true,
+    "implement_adaptive_probe_stop": true,
+    "reasoning_trigger": "prediction error / unseen action-effect context / goal ambiguity"
+  },
+  "held_out_transition_prediction": {
+    "mean_coverage": 0.7664627719193341,
+    "accuracy_on_covered": 0.9993194298858715
+  },
+  "probe_scheduler": {
+    "six_probe_random_coverage": 0.781942857142857,
+    "six_probe_round_robin_coverage": 0.9942857142857142,
+    "six_probe_uncertainty_coverage": 0.9942857142857142,
+    "eight_probe_round_robin_coverage": 1.0,
+    "eight_probe_uncertainty_coverage": 1.0,
+    "eight_probe_uncertainty_mode_accuracy": 0.9256190476190476,
+    "twelve_probe_uncertainty_mode_accuracy": 0.9408190476190477,
+    "conclusion": "Cover distinct action channels first, then spend additional probes on uncertainty."
+  },
+  "planner": {
+    "plans_found": 5,
+    "plans_fully_verified": 5,
+    "median_action_ratio_to_human": 0.18181818181818182,
+    "level2_plans_found": 0,
+    "level2_games_attempted": 5
+  },
+  "cross_level_transfer": {
+    "games_tested": 5,
+    "mean_effect_transfer": 0.9,
+    "mean_translation_transfer": 0.775,
+    "conclusion": "Transfer mechanics and confidence, but re-infer each later level's goal and plan."
+  },
+  "promotion": "PROMOTE_H2_PREDICTIVE_STATE"
+}
