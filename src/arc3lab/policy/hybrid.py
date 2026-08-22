@@ -5,13 +5,13 @@ from typing import Any
 
 from arc3lab.model.adapter import ModelAdapter, extract_json
 from arc3lab.perception.scene import compact_scene, grid_ascii
+from arc3lab.policy.effect_posterior import EffectPosteriorPolicy
 from arc3lab.policy.prompt import SYSTEM_PROMPT, USER_TEMPLATE
-from arc3lab.policy.structural import StructuralPolicy
 from arc3lab.types import ActionSpec, Scene
 
 
-class HybridPolicy(StructuralPolicy):
-    """Structural fallback + uncertainty-gated local model policy with short queues."""
+class HybridPolicy(EffectPosteriorPolicy):
+    """Effect-posterior fallback + uncertainty-gated local model policy."""
 
     def __init__(
         self,
@@ -42,14 +42,20 @@ class HybridPolicy(StructuralPolicy):
         return scene
 
     @staticmethod
-    def _parse_one(a: dict[str, Any], valid: tuple[int, ...], shape: tuple[int, int], confidence: float, reason: str) -> ActionSpec | None:
+    def _parse_one(
+        a: dict[str, Any],
+        valid: tuple[int, ...],
+        shape: tuple[int, int],
+        confidence: float,
+        reason: str,
+    ) -> ActionSpec | None:
         try:
-            aid = int(a.get("id"))
+            action_id = int(a.get("id"))
         except Exception:
             return None
-        if aid not in valid:
+        if action_id not in valid:
             return None
-        if aid == 6:
+        if action_id == 6:
             try:
                 x, y = int(a.get("x")), int(a.get("y"))
             except Exception:
@@ -57,7 +63,7 @@ class HybridPolicy(StructuralPolicy):
             if not (0 <= x < shape[1] and 0 <= y < shape[0]):
                 return None
             return ActionSpec(6, x=x, y=y, reason=reason, confidence=confidence)
-        return ActionSpec(aid, reason=reason, confidence=confidence)
+        return ActionSpec(action_id, reason=reason, confidence=confidence)
 
     def _model_budget_available(self) -> bool:
         return self.max_model_calls is None or self.model_calls < self.max_model_calls
@@ -88,7 +94,13 @@ class HybridPolicy(StructuralPolicy):
             for raw in raw_actions[:4]:
                 if not isinstance(raw, dict):
                     continue
-                spec = self._parse_one(raw, scene.available_actions, scene.grid.shape, confidence, reason)
+                spec = self._parse_one(
+                    raw,
+                    scene.available_actions,
+                    scene.grid.shape,
+                    confidence,
+                    reason,
+                )
                 if spec is not None:
                     out.append(spec)
             return out
