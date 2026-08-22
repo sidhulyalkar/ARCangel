@@ -12,7 +12,9 @@ Every real environment action is permanently charged to the current level; RESET
 
 Do not assume action meanings. Infer them from observed before/action/after evidence. Treat animations and volatile edge HUD/timer regions separately from gameplay state. Reason in terms of objects, shapes, adjacency, containment, symmetry, motion, selectable regions, and causal action effects rather than absolute public-game-specific coordinates.
 
-You have a Python ANALYSIS sandbox. Use it when exact calculation/search/history retrieval is more reliable than eyeballing the board. The sandbox cannot take real environment actions. It can inspect the current grid and the complete interaction ledger, so use it for BFS, component comparisons, action-effect statistics, cycle detection, candidate scoring, or testing an executable hypothesis. Do not request Python when the next action is already clear.
+You have a Python ANALYSIS sandbox. Use it when exact calculation/search/history retrieval is more reliable than eyeballing the board. The sandbox cannot take real environment actions. It can inspect the current grid and the complete interaction ledger, so use it for BFS, component comparisons, action-effect statistics, cycle detection, candidate scoring, transition prediction, or testing an executable hypothesis. Do not request Python when the next action is already clear.
+
+Goal inference and dynamics inference are separate problems. State a compact, falsifiable goal hypothesis even when the local transition mechanics are already understood. Later levels may preserve action semantics while changing the objective.
 
 Never use or infer public game IDs. Never rely on memorized game-specific solutions. Generalize from evidence in the current run.
 
@@ -28,6 +30,12 @@ DERIVED MEMORY SUMMARY
 TRANSFERABLE BELIEFS FROM THIS GAME
 {beliefs}
 
+PERSISTENT GOAL HYPOTHESES
+{goals}
+
+TEMPORAL PREDICTIVE MEMORY
+{predictive}
+
 CURRENT GRID (lossless hexadecimal colors; row 0 at top, col 0 at left)
 {ascii_grid}
 
@@ -42,10 +50,13 @@ Available variables/functions inside Python:
 - transitions: COMPLETE lossless transition ledger as dictionaries
 - recent_frames: up to 24 recent raw grids
 - beliefs: current transferable belief records
+- goals: persistent goal-hypothesis records
+- predictive_summary: temporal transition-memory diagnostics
+- predict(action_id, x=None, y=None): known next-state/effect prediction for the current temporal state when covered
 - recent(n), by_action(action_id), action_stats(), level_wins(), frame(i), diff_frames(i,j)
 The sandbox has safe Python builtins plus math, itertools, collections, heapq, deque. No imports/files/network.
 
-If you request Python, it should answer one discriminating question. Example uses include finding a shortest path under a hypothesized movement model, comparing all prior ACTION6 effects, detecting cycles, or locating structurally repeated objects.
+If you request Python, it should answer one discriminating question. Example uses include finding a shortest path under a hypothesized movement model, comparing all prior ACTION6 effects, detecting cycles, testing whether a queued plan depends on an uncertain transition, or locating structurally repeated objects.
 
 OUTPUT SCHEMA
 {{
@@ -67,6 +78,8 @@ Rules:
 - Every action id must be in valid_actions.
 - id=6 requires integer x=column and y=row inside the current grid. Other actions must omit/null x,y.
 - `plan_reliable=true` only when later actions are safe to queue without re-reasoning after each frame.
+- Set `delegate_world_model=true` only when constructing or testing an executable hypothesis with Python will materially reduce real-action risk; when true, provide a non-empty `python` program.
+- A high-confidence prediction mismatch means the current executable hypothesis is contradicted. Repair or bypass it rather than continuing a stale queue.
 """
 
 TOOL_RESULT_TEMPLATE = """Your requested Python analysis returned:
