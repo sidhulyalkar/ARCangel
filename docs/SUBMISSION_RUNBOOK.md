@@ -41,29 +41,31 @@ Primary hypothesis: D110R2's `EffectPosteriorPolicy` improves the V004/Qwen camp
 
 Recommended private-submission order: **first**.
 
-## S120 FINAL — h2 predictive state
+## S120 FINAL B — h2 predictive state
 
 Build ID:
 
 ```text
-S120-FINAL-20260822-A
+S120-FINAL-20260822-B
 ```
 
 Notebook SHA-256:
 
 ```text
-fc250554b30ff4254922dae192568a295160ea984859d2bcda48f490d33e9ff2
+7d61317a407f2db18e6e117a12b78ca633040367a0c8a607567e489f5021baf6
 ```
 
 Embedded source-bundle SHA-256:
 
 ```text
-b7353abdba5cd43b8bfcca0eb21c617450e0c68776970b6048779f507bad2b05
+e77eac56a8a7f7a242c3a894e0166970609cf8e78fa5295b0f519a83aba664bb
 ```
 
 Primary hypothesis: add D210R2-promoted h2 predictive-state verification, persistent goal hypotheses, prediction-error queue invalidation and actor-visible temporal memory while retaining S115's causal fallback.
 
 D210R2 research gate: **PASSED**.
+
+This B build embeds the same V005 source shape tracked by the active GitHub branch, including configurable `predictive_history_depth=2` and predictive-context coverage helpers.
 
 Recommended private-submission order: **second**.
 
