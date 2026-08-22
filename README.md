@@ -2,136 +2,189 @@
 
 A reproducible research and Kaggle submission harness for **ARC Prize 2026 — ARC-AGI-3**.
 
-The goal is not to memorize 25 public games. The goal is to compress the strongest ideas from coding agents, programmatic memory, object-centric perception, and active world-model induction into a **single offline RTX 6000 submission that generalizes to 110 unseen games**.
+ARCangel is built around one constraint: the public 25 games are a diagnostic distribution, not a lookup table. The goal is to compress the strongest ideas from coding agents, retrievable memory, causal action learning, temporal state abstraction and selective executable planning into a **single offline RTX PRO 6000 campaign that generalizes to 110 unseen games**.
 
-## Status
+## Current status — V005 predictive state
 
-**v0.1 starter is executable.** It includes:
+The repository has progressed beyond the original structural/model baseline. The active architecture is now evidence-driven by two completed CPU research programs:
 
-- official `arc-agi==0.9.8` / `arcengine==0.9.3` compatible runner;
-- exact local scorecard capture and per-level action telemetry;
-- lossless transition memory;
-- 4-connected object segmentation with translation-invariant shape hashes;
-- volatile-edge/HUD masking;
-- deterministic state-transition graph and novelty explorer;
-- ACTION6 click ranking with rarity/button priors and dead-target memory;
-- a reproducible random control;
-- an offline model lane using a local OpenAI-compatible server such as vLLM;
-- multimodal model prompts (rendered grid + lossless 0-F ASCII + object summary);
-- validated short action queues and deterministic fallback;
-- automatic local Qwen-model discovery on Kaggle inputs;
-- one-scorecard / one-`make()`-per-environment competition execution;
-- fail-soft per-game isolation plus a shared wall-clock deadline, so one bad environment or model reply does not destroy the whole submission;
-- protection from `GameAction.ACTION6` mutable-enum data races by passing thread-local `data=` directly to `env.step`;
-- leakage-resistant policy code: no public game IDs, source-derived rules, or per-game lookup tables.
+- **D110R2:** 72-config fallback tournament promoted a soft causal `EffectPosteriorPolicy` and rejected hard global anti-dead suppression, per-level primitive re-probing and a stronger static click prior.
+- **D210R2:** predictive-state/planner lab promoted **h2 temporal state** as the smallest global representation above 0.99 repeated-key consistency, measured 0.999319 exact held-out next-state accuracy on covered contexts, verified 5/5 executable plans, and found strong but imperfect cross-level mechanic transfer.
 
-The first generic structural control scored **0.1755** on the 25 public games at a 200-action cap, completing 2/183 levels. A seeded random control completed 0/183 in the same local setup. This is intentionally a calibration floor, not the candidate we expect to lead Kaggle.
-
-## The important scoring correction
-
-The prose competition description commonly shown in notebooks is slightly behind the uploaded toolkit. The supplied `arc-agi 0.9.8` scorer computes a completed level as:
+The resulting V005 loop is:
 
 ```text
-min((human_actions / agent_actions)^2 * 100, 115)
+observe
+  ↓
+h2 temporal predictive state
+  ↓
+known state-action context? ── yes ──→ predict / verify / amortize reliable plan
+  │
+  no
+  ↓
+Qwen goal + mechanic reasoning
+  ↓
+actor-gated Python analysis / executable hypothesis when useful
+  ↓
+real action
+  ↓
+prediction contradiction? ── yes ──→ clear stale queue + wake model + repair/bypass
+  │
+  no
+  ↓
+continue
 ```
 
-and then caps the game score by the **weighted fraction of levels completed**. Later levels receive larger weights. In practice:
+The model-free floor is no longer raw novelty alone. It softly exploits causal action evidence while leaving rare/conditional actions recoverable.
 
-1. **Completion dominates.** A later level is much more valuable than polishing an already-solved early level.
-2. **Efficiency still matters quadratically** until the completion cap is saturated.
-3. Super-human efficiency can provide up to a 15% per-level cushion, but cannot make a partially completed game score as if more levels were solved.
+## Why this architecture
 
-The toolkit also forces Kaggle into `OperationMode.COMPETITION`: one scorecard, one `make()` per environment, and RESET becomes a **level reset** rather than a full-game restart.
+### 1. The current frame is not enough
 
-## Why the winning architecture should be model-first
+D210R2 found mean repeated-key state-action consistency of only **0.7933** for visual state alone. Adding temporal context changed the picture:
 
-The current evidence points in one direction:
+| State representation | Mean consistency |
+|---|---:|
+| visual | 0.793337 |
+| visual + step mod 2 | 0.934718 |
+| visual + step mod 4 | 0.960049 |
+| h1 | 0.959275 |
+| **h2** | **0.991835** |
+| h3 | 0.997865 |
+| h1 + action counts | 0.997303 |
 
-| Approach | What it teaches us | Kaggle / public evidence |
+The predeclared global promotion target was 0.99, so **h2** is the smallest representation that clears it. ARCangel therefore keys its predictive cache using the current scene plus the two most recent before-state/action pairs.
+
+### 2. Once a context is known, prediction is nearly exact
+
+D210R2 held-out transition prediction achieved:
+
+- coverage: **0.766463**
+- exact next-state accuracy on covered transitions: **0.999319**
+
+That makes coverage the dominant problem. ARCangel does not force a world model over unknown states; it trusts supported temporal contexts for verification/amortization and keeps novel contexts model-led.
+
+### 3. Compiled control can be dramatically action-efficient
+
+D210R2 found five level-1 plans and replay-verified all five 3/3. Their median action count was only **18.18%** of the human baseline.
+
+But after replaying those prefixes, the same planner found **0/5** level-2 plans. Mean cross-level effect transfer was still 0.90 and translation transfer 0.775.
+
+The correct transfer unit is therefore:
+
+> **mechanics and confidence, not the previous level's entire plan.**
+
+Later levels inherit verified semantics and re-infer their own goal/route.
+
+### 4. Generic fallback should be causal, but soft
+
+D110R2 completed 72/72 model-free configurations without harness errors. `effect_posterior` had the best policy-family mean score, while re-probing primitives on every later level was uniformly worse than carrying early evidence.
+
+Hard anti-dead suppression regressed materially. That is an important ARC lesson: an action that appears dead in one state may be pivotal in another.
+
+`EffectPosteriorPolicy` therefore prefers channels with observed meaningful effects without permanently banning low-yield actions.
+
+## Core stack
+
+### Perception
+
+Every settled observation can be represented as:
+
+- rendered grid for visual gestalt;
+- lossless hexadecimal ASCII for exact inspection;
+- 4-connected components with color, size, bounding box, shape identity and edge contact;
+- HUD/volatile-edge masking so timers/status strips do not explode the state graph.
+
+### Lossless episodic memory
+
+Every real action preserves:
+
+```text
+before state
++ action / ACTION6 target
++ after state
++ changed / meaningful-changed cells
++ level completion / game over / win
+```
+
+Summaries are derived views. Raw history is retained for programmatic retrieval.
+
+### Temporal predictive memory
+
+`PredictiveTransitionMemory` stores a distribution over next visual signatures and coarse effects for:
+
+```text
+(h2 temporal state, action)
+```
+
+A repeated high-confidence prediction is checked against the next actual frame. A contradiction:
+
+1. increments mismatch telemetry;
+2. clears queued actions;
+3. records a high-confidence contradiction belief;
+4. forces the coding model to reason again.
+
+### Goal memory
+
+Goal hypotheses are stored separately from mechanic beliefs. This matters because later levels often preserve action semantics while changing the progress condition.
+
+The Qwen actor sees:
+
+- current grid / objects;
+- compact derived memory;
+- complete programmatically searchable transition ledger;
+- persistent transferable beliefs;
+- persistent goal hypotheses;
+- temporal predictive-memory diagnostics;
+- a `predict(action_id, x=None, y=None)` helper inside the bounded Python sandbox.
+
+### Actor-gated executable reasoning
+
+ARCangel does not force every environment into a simulator. The coding actor may request Python/world-model analysis when it expects that analysis to reduce real-action risk. Otherwise it can act directly or use the causal fallback.
+
+This follows the broader evidence from Duck/PRO-LONG/Tycho-style systems: preserve complete history, make it queryable, and build executable abstractions only when their expected planning value exceeds their orchestration cost.
+
+## Competition runtime
+
+The V004/V005 campaign shell is designed around the actual ARC3 Kaggle constraints:
+
+- **RTX PRO 6000**
+- Internet OFF
+- local Qwen3.6 27B FP8 through offline vLLM
+- 28-way continuous game queue
+- 132-minute per-game wall-clock allowance
+- shared campaign deadline
+- uncapped model/tool calls in the campaign config; wall clock allocates inference
+- one scorecard / one `make()` per environment
+- fail-soft game isolation
+- policy memory retained across competition-mode level RESET/retry
+- thread-local ACTION6 `data=` to avoid mutable enum action-data races.
+
+## Submission ladder
+
+Private submissions are treated as experiments, not roulette.
+
+| Candidate | Primary change | Question |
 |---|---|---|
-| Random | useful plumbing control only | sample notebook ~0.18 |
-| Stochastic Goose | online action-effect learning can work, but preview transfer collapsed | current sample ~0.25; preview winner was far stronger on 3 preview games |
-| Persistent-memory BFS | deterministic exploration + memory beats pure random cheaply | public notebook 0.46 |
-| Reki / Forge | vision model + structured JSON + reflection + action guards works | Milestone #1 places 2/3 |
-| Tufa “Duck” | **small local coding model + REPL + multimodal perception + short context** is the strongest proven Kaggle recipe | Milestone #1 winner; recent public Duck notebook ~1.17 |
-| PRO-LONG | never throw history away; search it programmatically instead of compressing it into prose | +18 pp average on public 25-game research eval |
-| Executable World Models / Tycho | build a simulator only when the actor expects planning value; verification fit alone is not the goal | public 25-game frontier-model saturation |
+| V004 / S110 | campaign/runtime anchor | is the local Qwen coding shell stable? |
+| **S115 FINAL** | + D110 effect-posterior fallback | does the causal fallback transfer under Qwen? |
+| **S120 FINAL** | + D210 h2 predictive verification + goals | can temporal verification amortize reasoning and stop stale plans? |
+| S130 next | adaptive campaign allocator | where should the 9-hour GPU budget go across 110 games? |
 
-The public 25-game research results and Kaggle leaderboard must not be conflated. Frontier proprietary models can nearly saturate the public set with unconstrained inference, while the Kaggle runtime is one RTX 6000 for <=9 hours and no internet. That **systems-compression gap** is the competition.
+Exact final notebook build IDs, SHA-256 hashes, required Kaggle inputs and Save & Run acceptance criteria live in [`docs/SUBMISSION_RUNBOOK.md`](docs/SUBMISSION_RUNBOOK.md).
 
-## Proposed winning stack: FRONTIER
-
-**F**rame abstraction  
-**R**etrievable lossless memory  
-**O**nline action semantics  
-**N**ovelty-guided probes  
-**T**ool/coding model  
-**I**nference-budget gating  
-**E**xecutable hypotheses when useful  
-**R**eplay-verified iteration
-
-### 1. Perception
-
-Every settled frame is represented three ways:
-
-- pixel image for gestalt/symmetry;
-- lossless 0-F ASCII grid for exact inspection;
-- object graph for components, shape identity, rarity, edge contact, and click candidates.
-
-Volatile edge cells are treated as likely HUD/timers so a shrinking status strip does not explode the state graph.
-
-### 2. Lossless episodic memory
-
-Every real action stores:
-
-```text
-before_state, action, target, after_state,
-changed_cells, meaningful_changed_cells,
-level_transition, game_over, win
-```
-
-Derived summaries can be regenerated. The raw interaction history is never replaced by a prose summary.
-
-### 3. Cheap controller below the LLM
-
-The deterministic layer handles:
-
-- legal-action filtering;
-- no-op / dead-target suppression;
-- obvious object clicks;
-- exact previously observed transitions;
-- state-graph novelty;
-- batching of a short, high-confidence model plan.
-
-The LLM should reason about **rules, goals, abstractions, and plans**, not waste tokens validating `0 <= x < 64`.
-
-### 4. Local model policy
-
-`HybridPolicy` can talk to an attached model through local vLLM. The model gets a rendered frame, exact ASCII, object summary, and compact transition statistics. It returns 1–4 legal actions, a falsifiable expected change, and its current world-model hypothesis.
-
-The first model target should be the same public Qwen 3.6 27B FP8 family used by Duck, because reproducing a known ~1%+ Kaggle system gives us a trustworthy ladder anchor before novel modifications.
-
-### 5. Active world-model delegation
-
-Do **not** force every game into a simulator. The next major branch should let the actor request an executable model when:
-
-- the goal is understood but sequence planning is hard;
-- repeated probes reveal stable deterministic dynamics;
-- path/search depth is larger than a few moves;
-- the current policy is cycling or repeatedly paying for rediscovery.
-
-The model is verified against the lossless transition ledger, but predictive fit is only a gate. If modeling costs more actions/tokens than direct play, bypass it.
+Research evidence and promotion decisions live in [`docs/D110_D210_RESULTS.md`](docs/D110_D210_RESULTS.md).
 
 ## Repository layout
 
 ```text
 src/arc3lab/
-  perception/     object segmentation, frame signatures, HUD masking, diffs
-  memory/         append-only episodic ledger
-  planning/       observed transition graph (world-model lane next)
-  policy/         random, structural, hybrid model policy
-  model/          Transformers + localhost/vLLM adapters
-  evaluation/     one-shot runner and exact scorer
+  perception/     segmentation, frame signatures, HUD masking, diffs
+  memory/         lossless episode ledger + h2 predictive transition memory
+  planning/       observed transition graph / executable-search substrate
+  policy/         structural, effect-posterior, hybrid and coding policies
+  model/          local model / OpenAI-compatible adapters
+  evaluation/     one-shot ARC runner + campaign diagnostics
 scripts/
   run_public.py
   run_competition.py
@@ -140,15 +193,20 @@ scripts/
 configs/
   v001-structural.json
   v002-ducklite.json
+  v003-angelcode.json
+  v004-campaign-baseline.json
+  v005-predictive-state.json
 kaggle/
-  generated submission notebooks
-artifacts/
-  local evaluation receipts
+  canonical generated submission candidates
+artifacts/experiments/
+  machine-readable public research promotion receipts
+docs/
+  architecture, experiment plan, results and submission runbook
 ```
 
-## Local public evaluation
+## Local evaluation
 
-Point at the uploaded `environment_files` directory:
+Point at the ARC environment files and run the generic policy without importing game source into the policy:
 
 ```bash
 PYTHONPATH=src python scripts/run_public.py \
@@ -159,93 +217,74 @@ PYTHONPATH=src python scripts/run_public.py \
   --output artifacts/v001.json
 ```
 
-Run a seeded random control:
+The public set is used to compare generic mechanisms. Public game IDs, coordinates and source-derived mechanics must never enter policy logic.
 
-```bash
-PYTHONPATH=src python scripts/run_public.py \
-  --env-dir /path/to/environment_files \
-  --policy random \
-  --max-actions 200 \
-  --workers 8 \
-  --output artifacts/random.json
-```
+## Research chronology
 
-Compare receipts:
+### V003R — AngelCode
 
-```bash
-PYTHONPATH=src python scripts/compare_runs.py artifacts/random.json artifacts/v001.json
-```
+Added bounded Python analysis over the full transition ledger, persistent beliefs, model-generated tool queries and short reliable action queues.
 
-## Kaggle model submission
+### V004C — campaign baseline
 
-Attach:
+Aligned the system with scoring/runtime economics: 28-way continuous scheduling, per-game wall-clock budgets, uncapped inference under the shared deadline and first-level mechanic discovery that persists into later weighted levels.
 
-1. the ARC-AGI-3 competition input;
-2. this repository (or use the generated embedded notebook);
-3. a public offline model dataset, ideally the Qwen 3.6 27B FP8 family used by Duck.
+### D110R2 — fallback selection
 
-Then launch the model locally and run:
+Promoted causal effect posterior; rejected repeated re-probing, hard anti-dead suppression and stronger static click bias.
 
-```bash
-PYTHONPATH=src python scripts/run_competition.py \
-  --policy hybrid \
-  --launch-vllm \
-  --max-actions 1200 \
-  --workers 6 \
-  --time-budget-seconds 29400
-```
+### D210R2 — temporal-state gate
 
-No external HTTP is used. Model calls go to `127.0.0.1`.
+Promoted h2 state, prediction-error reasoning triggers, compiled planning when supported, cross-level semantics with contradiction invalidation and structured probe coverage.
 
-## Submission ladder
+### V005 — active branch
 
-Do not mutate five things between Kaggle runs. Each submission should answer one question.
-
-| Version | Change from previous | What the LB teaches us |
-|---|---|---|
-| V001 | structural instrumented control | toolkit/runner sanity and low-cost floor |
-| V002 | exact-ish Duck/Qwen replication | our reproducible competitive anchor |
-| V003 | V002 + programmatic lossless-memory retrieval | whether context loss is the dominant failure |
-| V004 | V003 + transition/HUD abstraction + action queue verification | whether perception/state aliasing is dominant |
-| V005 | V004 + actor-gated executable world model | whether long-horizon planning is dominant |
-| V006 | V005 + model-call budget router / specialist portfolio | fit the best reasoning into 9 hours |
-
-The critical comparison is **V002→V003→V004→V005**, not V005 versus random.
+Integrates those promotions into the coding agent while preserving the V004 serving/campaign anchor.
 
 ## What to log from every Kaggle run
 
-Keep the notebook output artifacts even when the LB score is disappointing:
+Every receipt should make a leaderboard result interpretable:
 
-- total model calls and generated tokens;
-- actions per environment and per completed level;
-- resets/game-overs;
-- no-op action rate;
-- illegal-model-output repair rate;
-- ACTION6 target types and dead-target rate;
-- model confidence calibration;
-- number/length of queued plans;
-- memory retrieval usage;
-- world-model build/repair/use/bypass counts;
-- wall time and GPU-memory high-water mark.
+- levels/actions/resets per environment;
+- actions per completed level;
+- model calls/failures;
+- tool calls/failures;
+- queued actions used;
+- fallback actions;
+- prediction mismatches;
+- temporal prediction coverage/verification summary;
+- goal-hypothesis count;
+- actor-gated world-model delegations;
+- wall time / deadline exhaustion;
+- exact source/build manifest.
 
-The runner also records fail-soft errors, deadline exhaustion, total model calls, and model failures. A leaderboard point without these diagnostics is a lottery ticket. A leaderboard point with them is an experiment.
+A leaderboard point without telemetry is a lottery ticket. A leaderboard point with a controlled diff and receipt is an experiment.
 
-## Research references
+## Next high-leverage work
+
+After real S115/S120 receipts, the next campaign version should optimize **expected marginal score per GPU-second** rather than giving every hidden game equal effort. Candidate scheduler state includes current level, recent progress, elapsed GPU time, goal confidence, predictive coverage/mismatch rate, model failure rate and whether a reliable controller exists.
+
+The next per-game research frontier is **goal acquisition and pivotal-rule verification**, not another decimal point of transition prediction. A useful controller should ask which uncertain rule would most damage the proposed plan and spend the cheapest discriminating real probe on that assumption.
+
+## Guardrails against public-set overfitting
+
+- No game IDs in policy code.
+- No imports from `environment_files/*/*.py` in policy code.
+- No memorized public coordinates or solution sequences.
+- Metadata/human baselines are evaluator-only.
+- New heuristics are stated generically before per-game inspection.
+- Every major mechanism gets a public ablation/promotion gate and, when quota-worthy, one private LB experiment.
+- Cross-level transfer is confidence-weighted and contradiction-sensitive, never blind replay.
+
+## References
 
 - ARC Prize Milestone #1: https://arcprize.org/blog/arc-prize-2026-milestone-1
 - Tufa Duck Harness: https://tufalabs.ai/research/duck-harness/
 - Duck source: https://github.com/Tufalabs/duck-harness
 - PRO-LONG: https://arxiv.org/abs/2607.20064
 - Tycho: https://arxiv.org/abs/2607.28287
-- Executable World Models: https://arxiv.org/abs/2605.05138
 - ARC toolkit competition mode: https://docs.arcprize.org/toolkit/competition_mode
 
-## Guardrails against public-set overfitting
+ARCangel's working thesis is now simple:
 
-- No game IDs in policy code.
-- No imports from `environment_files/*/*.py` in policy code.
-- Metadata baselines are evaluator-only.
-- New heuristics must be stated generically before looking at their per-game winners/losers.
-- Every major change gets a public ablation and, when worth the quota, one private LB experiment.
-
-That discipline is not bureaucracy. It is our best defense against building a 25-game museum exhibit instead of an agent.
+> **Learn enough mechanics to predict, infer what winning means, compile behavior only when it earns trust, and spend expensive model reasoning where prediction or purpose is uncertain.**
