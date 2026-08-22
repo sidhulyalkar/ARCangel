@@ -1,0 +1,47 @@
+{
+  "schema": "arcangel-experiment-summary-v1",
+  "experiment": "D110R2 CPU Deep Policy Tournament",
+  "date": "2026-08-22",
+  "public_games": 25,
+  "configurations": 72,
+  "errors": 0,
+  "policies": [
+    "baseline",
+    "reprobe_each_level",
+    "effect_posterior",
+    "anti_dead",
+    "click_prior",
+    "exploit_change"
+  ],
+  "budgets": [80, 160, 320, 640],
+  "reset_limits": [0, 1, 2],
+  "promoted_configuration": {
+    "policy": "effect_posterior",
+    "action_ceiling": 320,
+    "max_resets": 1,
+    "official_score": 0.20219029976815445,
+    "levels_completed": 4,
+    "games_with_progress": 4,
+    "total_actions": 4925,
+    "scope": "model-free fallback only"
+  },
+  "policy_family_mean_scores": {
+    "effect_posterior": 0.185896,
+    "exploit_change": 0.185687,
+    "baseline": 0.179964,
+    "click_prior": 0.179964,
+    "reprobe_each_level": 0.164505,
+    "anti_dead": 0.154009
+  },
+  "cross_level_carry": {
+    "baseline_minus_reprobe_score_delta": 0.01546,
+    "matched_cells": 12,
+    "conclusion": "Preserve learned primitive semantics across later levels and invalidate only on contradiction."
+  },
+  "negative_results": [
+    "Hard/global anti-dead suppression regressed materially; deadness must remain contextual.",
+    "A stronger static ACTION6 click prior did not improve aggregate score.",
+    "The 320-action/one-reset optimum must not be imposed on the full Qwen agent; it calibrated only the model-free fallback."
+  ],
+  "promotion": "PROMOTE_EFFECT_POSTERIOR_FALLBACK"
+}
