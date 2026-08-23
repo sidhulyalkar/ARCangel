@@ -1,0 +1,13 @@
+{
+  "version": "v007-falsifiable-queue",
+  "parent": "v006-expected-effect",
+  "policy": "verified_coding",
+  "model": "vrfai/Qwen3.6-27B-FP8",
+  "predictive_history_depth": 2,
+  "require_falsifiable_queue": true,
+  "expected_effect_contract": ["dead", "change", "level", "unknown"],
+  "invalidate_queue_on_explicit_effect_mismatch": true,
+  "primary_hypothesis": "Multi-action plans should execute without re-reasoning only when every queued step is explicitly falsifiable.",
+  "submission": "S130-FINAL-20260823-C",
+  "anti_overfit": "No public game IDs, coordinates, source mechanics, or lookup tables."
+}
