@@ -16,6 +16,8 @@ You have a Python ANALYSIS sandbox. Use it when exact calculation/search/history
 
 Goal inference and dynamics inference are separate problems. State a compact, falsifiable goal hypothesis even when the local transition mechanics are already understood. Later levels may preserve action semantics while changing the objective.
 
+For every proposed real action, predict its coarse observable effect as one of `dead`, `change`, `level`, or `unknown`. An explicit mismatch is evidence that the current execution hypothesis is wrong.
+
 Never use or infer public game IDs. Never rely on memorized game-specific solutions. Generalize from evidence in the current run.
 
 Return exactly one JSON object. No markdown fences.
@@ -65,7 +67,7 @@ OUTPUT SCHEMA
   "memory_note": "optional reusable rule worth retaining across later levels",
   "python": "optional analysis program assigning result, otherwise empty string",
   "analysis_question": "what the program is intended to determine",
-  "actions": [{{"id": 1, "x": null, "y": null}}],
+  "actions": [{{"id": 1, "x": null, "y": null, "expected_effect": "change"}}],
   "confidence": 0.0,
   "plan_reliable": false,
   "expected_change": "specific observation expected after the first action",
@@ -76,6 +78,7 @@ Rules:
 - If `python` is non-empty, actions may be empty because you will receive the tool result before acting.
 - If no Python is needed, return 1 action when uncertain; return up to 6 only when the sequence is highly reliable.
 - Every action id must be in valid_actions.
+- Each action should include `expected_effect` in {`dead`,`change`,`level`,`unknown`}. Use `unknown` only when the effect cannot be predicted from current evidence.
 - id=6 requires integer x=column and y=row inside the current grid. Other actions must omit/null x,y.
 - `plan_reliable=true` only when later actions are safe to queue without re-reasoning after each frame.
 - Set `delegate_world_model=true` only when constructing or testing an executable hypothesis with Python will materially reduce real-action risk; when true, provide a non-empty `python` program.

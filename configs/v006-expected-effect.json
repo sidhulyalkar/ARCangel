@@ -1,0 +1,13 @@
+{
+  "version": "v006-expected-effect",
+  "parent": "v005-predictive-state",
+  "policy": "verified_coding",
+  "model": "vrfai/Qwen3.6-27B-FP8",
+  "predictive_history_depth": 2,
+  "require_falsifiable_queue": false,
+  "expected_effect_contract": ["dead", "change", "level", "unknown"],
+  "invalidate_queue_on_explicit_effect_mismatch": true,
+  "primary_hypothesis": "Explicit per-action effect verification catches wrong execution hypotheses before they cascade into scored action waste.",
+  "submission": "S125-FINAL-20260823-C",
+  "anti_overfit": "No public game IDs, coordinates, source mechanics, or lookup tables."
+}
