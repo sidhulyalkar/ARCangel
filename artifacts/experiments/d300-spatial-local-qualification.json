@@ -1,0 +1,49 @@
+{
+  "experiment": "D300-Spatial-Local-Qualification",
+  "architecture": "V006-spatial-intelligence",
+  "status": "PASS",
+  "date": "2026-08-23",
+  "purpose": "Qualify generic spatial geometry, causal control identification, and exact shortest-path execution before consuming a private Kaggle submission.",
+  "source_scope": [
+    "src/arc3lab/perception/spatial.py",
+    "src/arc3lab/planning/spatial.py",
+    "src/arc3lab/policy/spatial_coding.py"
+  ],
+  "results": {
+    "compileall": "PASS",
+    "pytest": {
+      "passed": 31,
+      "failed": 0
+    },
+    "randomized_shortest_path_audit": {
+      "seed": 20260823,
+      "cases": 1000,
+      "reference": "independent four-neighbor BFS over randomized 10x10 obstacle fields",
+      "matches": 1000,
+      "mismatches": 0
+    }
+  },
+  "covered_failure_modes": [
+    "all eight relative directions",
+    "raycast and line-of-sight blocking",
+    "controlled-object inference without color prior",
+    "action displacement learning without action-name prior",
+    "global camera/world translation rejection",
+    "duplicate actor-like component ambiguity",
+    "collateral world motion translation-purity gate",
+    "full actor-footprint collision geometry",
+    "shortest detour around obstacles",
+    "spatial sandbox plan queries",
+    "unknown-control auto-plan rejection",
+    "dynamic obstacle pre-action route invalidation",
+    "compiled actor-anchor expectation attachment"
+  ],
+  "known_scope_limits": [
+    "Exact planner currently models translational locomotion; pushes, rotations, teleports and inventory-like interactions remain model-led unless learned separately.",
+    "Goal semantics remain Qwen-selected; V006 does not yet induce executable goal predicates automatically.",
+    "Dihedral transforms are represented as a hook but symmetry-transfer automation is deferred to a later hypothesis.",
+    "Kaggle RTX Save & Run and private leaderboard transfer are not established by this local qualification."
+  ],
+  "promotion_candidate": "S135-FINAL-20260823-B",
+  "promotion_gate": "Require exact S135 notebook Save & Run pass, then use one-per-day private score plus spatial telemetry before merging/promoting V006."
+}
