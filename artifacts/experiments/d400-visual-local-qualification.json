@@ -1,0 +1,33 @@
+{
+  "experiment": "D400-Visual-Local-Qualification",
+  "architecture": "V008-visual-belief-search",
+  "date": "2026-08-24",
+  "status": "PASS",
+  "motivation": {
+    "private_submission": "S115",
+    "private_score": 0.10,
+    "interpretation": "Treat upstream visual orientation and goal grounding as the dominant failure hypothesis rather than stacking more execution heuristics."
+  },
+  "results": {
+    "compileall": "PASS",
+    "pytest": {"passed": 40, "failed": 0},
+    "stress": {
+      "translated_object_tracking": {"cases": 1500, "failures": 0},
+      "duplicate_object_association": {"cases": 1000, "failures": 0},
+      "counterfactual_goal_progress": {"cases": 1000, "failures": 0},
+      "action6_candidate_legality": {"cases": 1000, "failures": 0},
+      "temporal_packet_construction": {"cases": 1000, "failures": 0}
+    }
+  },
+  "visual_packet": {
+    "layout": ["t-2", "t-1", "current", "delta"],
+    "live_render_side": 384
+  },
+  "private_safe": true,
+  "known_limits": [
+    "Connected-component tracking is a generic visual primitive, not full scene segmentation.",
+    "Multi-part co-moving entities are exposed to the semantic model but are not automatically promoted to a composite exact planner actor.",
+    "Counterfactual scores are causal priors, not learned hidden-game rules.",
+    "Kaggle RTX Save & Run and private leaderboard transfer remain unvalidated until the exact S160 artifact is executed."
+  ]
+}
