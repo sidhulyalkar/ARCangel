@@ -1,0 +1,52 @@
+{
+  "version": "v006-spatial-intelligence",
+  "policy": "spatial_coding",
+  "parent": "v005-predictive-state",
+  "model": "vrfai/Qwen3.6-27B-FP8",
+  "accelerator": "RTX Pro 6000",
+  "internet": false,
+  "max_actions_per_game_safety": 1000000,
+  "max_resets": 3,
+  "reasoning_interval": 2,
+  "max_model_calls_per_game": null,
+  "max_tool_calls_per_game": null,
+  "max_generation_tokens": 2048,
+  "temperature": 0.6,
+  "top_p": 0.95,
+  "top_k": 20,
+  "enable_thinking": true,
+  "vllm_max_model_len": 32768,
+  "vllm_gpu_memory_utilization": 0.92,
+  "vllm_max_num_seqs": 32,
+  "predictive_history_depth": 2,
+  "fallback": "effect_posterior",
+  "spatial_plan_horizon": 12,
+  "spatial_control": {
+    "min_actor_confidence": 0.72,
+    "min_motion_evidence": 3,
+    "min_distinct_actions": 2,
+    "min_translation_vectors": 2,
+    "min_vector_confidence": 0.8,
+    "min_translation_purity": 0.66,
+    "require_unique_current_actor_candidate": true,
+    "reject_global_camera_translation": true
+  },
+  "spatial_execution": {
+    "planner": "exact_shortest_action_bfs",
+    "actor_geometry": "full_footprint",
+    "directions": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
+    "supported_goal_relations": ["touch", "adjacent8", "overlap", "center", "inside"],
+    "verify_actor_anchor_after_each_compiled_action": true,
+    "recheck_geometry_before_each_queued_action": true,
+    "model_selects_target_and_goal_relation": true
+  },
+  "runtime_hardening": {
+    "disabled_vllm_kernel": "FlashInferFP8ScaledMMLinearKernel",
+    "expected_fp8_kernel": "CutlassFP8ScaledMMLinearKernel",
+    "cuda_driver_linker_preflight": true,
+    "official_gateway_rerun": true,
+    "save_run_submission_parquet": true
+  },
+  "primary_hypothesis": "After causal identification of a controlled object and translational action semantics, exact spatial geometry plus guarded shortest-path execution will reduce scored action waste without imposing public-game-specific semantics.",
+  "private_safe_boundary": "No public game IDs, coordinates, source mechanics, action-name assumptions, player-color assumptions, target-color assumptions, or solution lookup tables. Qwen infers semantic roles; exact code handles only geometry after causal evidence clears conservative gates."
+}

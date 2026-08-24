@@ -1,0 +1,85 @@
+{
+  "submission": "S135",
+  "build_id": "S135-FINAL-20260823-B",
+  "architecture": "V006-spatial-intelligence",
+  "repository_branch": "agent/v006-spatial-intelligence",
+  "repository_base_main": "72c0093ba258040d8baba615033373ffc168f19b",
+  "parent_submission": "S120-CANONICAL-20260823-G",
+  "notebook": {
+    "filename": "ARCangel_S135_FINAL_B_SpatialIntelligence.ipynb",
+    "sha256": "b070dc1d412c49b32f8d91c63c606f21370ad6cd0ad93f292446130868870ddf",
+    "embedded_source_sha256": "0055eaae67277191ead3499b41b5e00181cb1c60775e8b9ae50cb0fae6c90a9f"
+  },
+  "primary_hypothesis": "Once the controlled object and translational action semantics are learned causally, exact 360-degree geometry plus guarded shortest-path execution improves private level completion and action efficiency over canonical V005.",
+  "private_safe": true,
+  "private_safe_guards": [
+    "no public game IDs",
+    "no public coordinates",
+    "no hard-coded action meanings",
+    "no player color prior",
+    "no target color prior",
+    "no source mechanics",
+    "no solution lookup table",
+    "model selects semantic target and goal relation",
+    "exact planner runs only after causal control gates pass"
+  ],
+  "spatial_gates": {
+    "min_actor_confidence": 0.72,
+    "require_unique_current_actor_candidate": true,
+    "min_motion_evidence": 3,
+    "min_distinct_actions": 2,
+    "min_translation_vectors": 2,
+    "min_vector_confidence": 0.8,
+    "min_translation_purity": 0.66,
+    "reject_global_camera_translation": true,
+    "recheck_geometry_before_each_queued_action": true,
+    "verify_actor_anchor_after_each_compiled_action": true
+  },
+  "local_validation": {
+    "source_compile": "PASS",
+    "pytest": {
+      "status": "PASS",
+      "passed": 31
+    },
+    "randomized_shortest_path_audit": {
+      "cases": 1000,
+      "matches": 1000,
+      "mismatches": 0
+    },
+    "synthetic_notebook_spatial_preflight": "EMBEDDED"
+  },
+  "kaggle": {
+    "accelerator": "NVIDIA RTX PRO 6000",
+    "internet": false,
+    "inputs": [
+      "ARC Prize 2026 - ARC-AGI-3",
+      "ARC3 vLLM H100 Wheelhouse V3",
+      "vrfai Qwen3.6 27B FP8 HF Snapshot"
+    ],
+    "vllm": "0.19.0",
+    "disabled_kernel": "FlashInferFP8ScaledMMLinearKernel",
+    "expected_fp8_linear_kernel": "CutlassFP8ScaledMMLinearKernel",
+    "submission_file": "/kaggle/working/submission.parquet",
+    "hidden_rerun": "official ARC-AGI-3-Agents framework via gateway:8001"
+  },
+  "required_save_run_markers": [
+    "ARCANGEL SUBMISSION BUILD: S135-FINAL-20260823-B",
+    "V006 SPATIAL ENGINE SYNTHETIC PREFLIGHT PASS",
+    "ARC TOOLKIT PASS",
+    "VLLM PACKAGE PASS",
+    "MODEL INPUT PASS: S135-FINAL-20260823-B",
+    "CUDA DRIVER RUNTIME LOAD PASS",
+    "CUDA DRIVER LINKER PASS",
+    "VLLM SERVER PASS",
+    "FLASHINFER FP8 LINEAR KERNEL DISABLE PASS",
+    "FULL INFRASTRUCTURE PREFLIGHT PASS",
+    "DUMMY SUBMISSION PARQUET PASS",
+    "SAVE/RUN VALIDATION PASS: S135-FINAL-20260823-B",
+    "SUBMISSION FILE READY: /kaggle/working/submission.parquet"
+  ],
+  "forbidden_notebook_markers": [
+    "MODEL_SCORE < 45",
+    "_planned_centers"
+  ],
+  "promotion_status": "awaiting-kaggle-save-run-and-private-score"
+}

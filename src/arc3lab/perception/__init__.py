@@ -1,4 +1,24 @@
-from .scene import build_scene, frame_grid
-from .diffs import diff_summary, infer_hud_mask
+from arc3lab.perception.scene import build_scene, compact_scene, frame_grid, grid_ascii
+from arc3lab.perception.spatial import (
+    DIRECTIONS_8,
+    SpatialControlModel,
+    anchor_valid_mask,
+    component_relation,
+    direction8,
+    raycast8,
+    spatial_summary,
+)
 
-__all__ = ["build_scene", "frame_grid", "diff_summary", "infer_hud_mask"]
+__all__ = [
+    "build_scene",
+    "compact_scene",
+    "frame_grid",
+    "grid_ascii",
+    "DIRECTIONS_8",
+    "SpatialControlModel",
+    "anchor_valid_mask",
+    "component_relation",
+    "direction8",
+    "raycast8",
+    "spatial_summary",
+]
