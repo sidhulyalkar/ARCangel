@@ -72,6 +72,7 @@ class OpenAICompatLocalAdapter(ModelAdapter):
         top_p: float = 1.0,
         top_k: int | None = None,
         enable_thinking: bool = False,
+        image_side: int = 256,
     ) -> None:
         self.model = model
         self.base_url = base_url.rstrip("/")
@@ -81,6 +82,10 @@ class OpenAICompatLocalAdapter(ModelAdapter):
         self.top_p = float(top_p)
         self.top_k = int(top_k) if top_k is not None else None
         self.enable_thinking = bool(enable_thinking)
+        # Keep the legacy 256px behavior by default. Vision-first policies can request
+        # a larger raster when a temporal packet contains several frames. Clamp the
+        # value so a malformed config cannot explode visual-token cost.
+        self.image_side = max(128, min(int(image_side), 768))
 
     def complete(self, system: str, user: str, grid: Any | None = None) -> str:
         import base64
@@ -100,7 +105,8 @@ class OpenAICompatLocalAdapter(ModelAdapter):
                     [255,133,27],[146,18,49],[79,204,48],[163,86,214],
                 ], dtype=np.uint8)
                 arr = palette[np.asarray(grid, dtype=np.int64)]
-                img = Image.fromarray(arr, mode="RGB").resize((256, 256), Image.Resampling.NEAREST)
+                side = int(self.image_side)
+                img = Image.fromarray(arr, mode="RGB").resize((side, side), Image.Resampling.NEAREST)
                 buf = io.BytesIO()
                 img.save(buf, format="PNG", optimize=True)
                 b64 = base64.b64encode(buf.getvalue()).decode("ascii")
@@ -126,6 +132,7 @@ class OpenAICompatLocalAdapter(ModelAdapter):
         if self.enable_thinking:
             payload["chat_template_kwargs"] = {"enable_thinking": True}
         r = requests.post(f"{self.base_url}/chat/completions", json=payload, timeout=self.timeout)
+        # If a text-only model rejects image content, retry with the same structured text.
         if not r.ok and grid is not None:
             payload["messages"][1]["content"] = user
             r = requests.post(f"{self.base_url}/chat/completions", json=payload, timeout=self.timeout)

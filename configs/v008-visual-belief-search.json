@@ -1,0 +1,44 @@
+{
+  "version": "v008-visual-belief-search",
+  "policy": "visual_coding",
+  "parent": "v006-spatial-intelligence",
+  "model": "vrfai/Qwen3.6-27B-FP8",
+  "accelerator": "RTX Pro 6000",
+  "internet": false,
+  "reasoning_interval": 2,
+  "max_model_calls_per_game": null,
+  "max_tool_calls_per_game": null,
+  "predictive_history_depth": 2,
+  "visual_image_side": 384,
+  "temporal_visual_packet": ["t-2", "t-1", "current", "delta(t-1,current)"],
+  "max_click_candidates": 14,
+  "candidate_limit": 20,
+  "visual_tracking": {
+    "persistent_component_tracks": true,
+    "mild_transform_matching": true,
+    "co_moving_groups": true
+  },
+  "decision_model": {
+    "primitive_candidates": true,
+    "object_grounded_action6": true,
+    "supported_spatial_plans": true,
+    "goal_progress_weight": 1.15,
+    "information_value_weight": 0.55,
+    "game_over_risk_weight": -2.2,
+    "collision_risk_weight": -1.5,
+    "candidate_scores_are_advisory": true
+  },
+  "goal_memory": {
+    "translation_invariant_visual_signatures": true,
+    "supported_relations": ["touch", "adjacent8", "overlap", "center", "inside", "click", "remove", "transform", "unknown"],
+    "cross_level_transfer": "soft"
+  },
+  "runtime_hardening": {
+    "disabled_vllm_kernel": "FlashInferFP8ScaledMMLinearKernel",
+    "expected_fp8_kernel": "CutlassFP8ScaledMMLinearKernel",
+    "cuda_driver_linker_preflight": true,
+    "official_gateway_rerun": true,
+    "save_run_submission_parquet": true
+  },
+  "primary_hypothesis": "Temporal visual orientation plus persistent entities, causal affordances, executable visual goal beliefs, and counterfactual legal action selection improves private ARC-AGI-3 transfer after S115 scored 0.10."
+}

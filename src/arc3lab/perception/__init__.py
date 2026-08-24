@@ -8,6 +8,7 @@ from arc3lab.perception.spatial import (
     raycast8,
     spatial_summary,
 )
+from arc3lab.perception.visual import VisualTracker, temporal_visual_packet, visual_signature
 
 __all__ = [
     "build_scene",
@@ -21,4 +22,7 @@ __all__ = [
     "direction8",
     "raycast8",
     "spatial_summary",
+    "VisualTracker",
+    "temporal_visual_packet",
+    "visual_signature",
 ]

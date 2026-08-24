@@ -1,0 +1,21 @@
+{
+  "submission": "S160",
+  "build_id": "S160-FINAL-20260824-B",
+  "architecture": "V008-visual-belief-search",
+  "notebook": {
+    "filename": "ARCangel_S160_FINAL_B_VisualBeliefSearch.ipynb",
+    "sha256": "f83666cd2e1082c70eace20e35231f5f9a36599e1e73265a7dd99782be8831e6",
+    "embedded_source_sha256": "db947cda346279fe0f50891eef17c478dc7b9a53dec4ee84d82bb8ba751e7b91"
+  },
+  "parent": "S135-FINAL-20260823-B",
+  "private_signal_motivation": {
+    "S115_score": 0.1
+  },
+  "visual_image_side": 384,
+  "local_validation": {
+    "pytest_passed": 40,
+    "randomized_checks": 5500,
+    "randomized_failures": 0
+  },
+  "promotion_status": "awaiting-kaggle-save-run"
+}

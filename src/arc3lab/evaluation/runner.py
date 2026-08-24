@@ -36,6 +36,11 @@ def _error_result(game_id: str, exc: BaseException) -> dict[str, Any]:
         "spatial_plans_compiled": 0,
         "spatial_plan_actions": 0,
         "spatial_plan_mismatches": 0,
+        "visual_packet_calls": 0,
+        "visual_candidate_selections": 0,
+        "visual_goal_updates": 0,
+        "visual_affordance_observations": 0,
+        "visual_expectation_mismatches": 0,
         "world_model_delegations": 0,
         "goal_hypotheses": 0,
         "deadline_exhausted": False,
@@ -92,6 +97,8 @@ def run_game(
         if state == "GAME_OVER":
             if resets >= max_resets:
                 break
+            # Record the losing transition before retrying. In competition mode RESET
+            # restarts the current level, so retain the game's learned mechanics/memory.
             try:
                 policy.observe(frame)
             except Exception:
@@ -107,10 +114,13 @@ def run_game(
         before_level = int(getattr(frame, "levels_completed", 0))
         spec = policy.choose(scene)
         if spec.action_id not in scene.available_actions:
+            # Never burn a scored action on an illegal model output.
             legal = next((a for a in scene.available_actions if a != 0), 0)
             spec = ActionSpec(legal, reason="illegal-output guard", confidence=0.0)
 
         action = GameAction.from_id(spec.action_id)
+        # GameAction enum members carry mutable action_data. Calling set_data() can race
+        # across concurrent games for ACTION6. Pass thread-local data directly instead.
         frame = env.step(
             action,
             data=spec.data,
@@ -124,6 +134,7 @@ def run_game(
             )
             level_start_actions = actions
 
+    # Observe terminal/latest frame once so the final transition is not lost.
     try:
         policy.observe(frame)
     except Exception:
@@ -149,6 +160,11 @@ def run_game(
         "spatial_plans_compiled": int(getattr(policy, "spatial_plans_compiled", 0)),
         "spatial_plan_actions": int(getattr(policy, "spatial_plan_actions", 0)),
         "spatial_plan_mismatches": int(getattr(policy, "spatial_plan_mismatches", 0)),
+        "visual_packet_calls": int(getattr(policy, "visual_packet_calls", 0)),
+        "visual_candidate_selections": int(getattr(policy, "visual_candidate_selections", 0)),
+        "visual_goal_updates": int(getattr(policy, "visual_goal_updates", 0)),
+        "visual_affordance_observations": int(getattr(policy, "visual_affordance_observations", 0)),
+        "visual_expectation_mismatches": int(getattr(policy, "visual_expectation_mismatches", 0)),
         "world_model_delegations": int(getattr(policy, "world_model_delegations", 0)),
         "goal_hypotheses": len(getattr(policy, "goals", [])),
         "predictive_summary": (
@@ -220,7 +236,7 @@ def run_suite(
                 stop_at_monotonic=stop_at,
                 game_time_budget_seconds=game_time_budget_seconds,
             )
-        except BaseException as exc:
+        except BaseException as exc:  # submission robustness: preserve other games
             return _error_result(game_id, exc)
 
     try:
@@ -246,6 +262,7 @@ def run_suite(
                     except BaseException as exc:
                         results.append(_error_result(gid, exc))
     finally:
+        # Closing the single scorecard is more important than propagating one game error.
         try:
             scorecard = arc.close_scorecard(card_id)
         except Exception as exc:
@@ -271,6 +288,11 @@ def run_suite(
             "spatial_plans_compiled": sum(int(x.get("spatial_plans_compiled", 0)) for x in results),
             "spatial_plan_actions": sum(int(x.get("spatial_plan_actions", 0)) for x in results),
             "spatial_plan_mismatches": sum(int(x.get("spatial_plan_mismatches", 0)) for x in results),
+            "visual_packet_calls": sum(int(x.get("visual_packet_calls", 0)) for x in results),
+            "visual_candidate_selections": sum(int(x.get("visual_candidate_selections", 0)) for x in results),
+            "visual_goal_updates": sum(int(x.get("visual_goal_updates", 0)) for x in results),
+            "visual_affordance_observations": sum(int(x.get("visual_affordance_observations", 0)) for x in results),
+            "visual_expectation_mismatches": sum(int(x.get("visual_expectation_mismatches", 0)) for x in results),
             "world_model_delegations": sum(int(x.get("world_model_delegations", 0)) for x in results),
             "goal_hypotheses": sum(int(x.get("goal_hypotheses", 0)) for x in results),
         },
