@@ -1,0 +1,42 @@
+{
+  "experiment": "D410-Perceptual-Local-Qualification",
+  "architecture": "V009-perceptual-scientist-frontier",
+  "date": "2026-08-24",
+  "status": "PASS",
+  "motivation": {
+    "private_submission": "S115",
+    "private_score": 0.1,
+    "interpretation": "Prioritize orientation, perception, causal grounding, and uncertainty reduction before further execution heuristics."
+  },
+  "results": {
+    "compileall": "PASS",
+    "focused_pytest": {
+      "passed": 20,
+      "failed": 0
+    },
+    "randomized_perceptual_scenes": {
+      "cases": 5000,
+      "failures": 0
+    },
+    "articulation_vs_bruteforce": {
+      "cases": 1477,
+      "failures": 0
+    },
+    "full_64x64_topology": "PASS",
+    "multiview_request_construction": "PASS",
+    "runner_multiview_telemetry": "PASS",
+    "frontier_shortest_route_vs_reference": {
+      "cases": 2500,
+      "failures": 0
+    }
+  },
+  "parent_qualification": {
+    "v008_regression_suite": {
+      "passed": 40,
+      "failed": 0
+    },
+    "v008_randomized_checks": 5500
+  },
+  "private_safe": true,
+  "promotion_candidate": "S170-FINAL-20260824-C"
+}

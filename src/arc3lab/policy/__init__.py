@@ -5,6 +5,7 @@ from arc3lab.policy.random_policy import RandomPolicy
 from arc3lab.policy.spatial_coding import SpatialCodingPolicy
 from arc3lab.policy.structural import StructuralPolicy
 from arc3lab.policy.visual_coding import VisualDecisionPolicy
+from arc3lab.policy.perceptual_coding import PerceptualDecisionPolicy
 
 __all__ = [
     "CodingPolicy",
@@ -14,4 +15,5 @@ __all__ = [
     "SpatialCodingPolicy",
     "StructuralPolicy",
     "VisualDecisionPolicy",
+    "PerceptualDecisionPolicy",
 ]

@@ -1,0 +1,19 @@
+{
+  "submission": "S170",
+  "build_id": "S170-FINAL-20260824-D",
+  "architecture": "V009-perceptual-scientist-frontier",
+  "notebook": {
+    "filename": "ARCangel_S170_FINAL_D_PerceptualFrontier.ipynb",
+    "sha256": "8438e8c162f3e7f28dfaab369b51d8c869382530beb3e9d08bc00d6057c71be2",
+    "embedded_source_sha256": "60a425a86ea33239f41d0156ba17d55879cf1d814ff6822ec893cd71ab41cf19"
+  },
+  "parent": "S170-FINAL-20260824-C",
+  "change_class": "deployment_only",
+  "policy_source_changed": false,
+  "runtime_fix": {
+    "issue": "malformed --limit-mm-per-prompt JSON argv",
+    "canonical_value": "{\"image\":2,\"video\":0}",
+    "construction": "json.dumps + json.loads round-trip preflight"
+  },
+  "promotion_status": "awaiting-kaggle-save-run"
+}

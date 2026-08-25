@@ -37,6 +37,9 @@ def _error_result(game_id: str, exc: BaseException) -> dict[str, Any]:
         "spatial_plan_actions": 0,
         "spatial_plan_mismatches": 0,
         "visual_packet_calls": 0,
+        "multiview_calls": 0,
+        "frontier_fallback_actions": 0,
+        "frontier_known_states": 0,
         "visual_candidate_selections": 0,
         "visual_goal_updates": 0,
         "visual_affordance_observations": 0,
@@ -161,10 +164,19 @@ def run_game(
         "spatial_plan_actions": int(getattr(policy, "spatial_plan_actions", 0)),
         "spatial_plan_mismatches": int(getattr(policy, "spatial_plan_mismatches", 0)),
         "visual_packet_calls": int(getattr(policy, "visual_packet_calls", 0)),
+        "multiview_calls": int(getattr(policy, "multiview_calls", 0)),
+        "frontier_fallback_actions": int(getattr(policy, "frontier_fallback_actions", 0)),
+        "frontier_known_states": len(getattr(getattr(policy, "exploration_frontier", None), "nodes", {})),
         "visual_candidate_selections": int(getattr(policy, "visual_candidate_selections", 0)),
         "visual_goal_updates": int(getattr(policy, "visual_goal_updates", 0)),
         "visual_affordance_observations": int(getattr(policy, "visual_affordance_observations", 0)),
         "visual_expectation_mismatches": int(getattr(policy, "visual_expectation_mismatches", 0)),
+        "final_orientation_entropy": float(
+            getattr(policy, "last_perceptual_state", {}).get("orientation_entropy", 1.0)
+        ) if isinstance(getattr(policy, "last_perceptual_state", {}), dict) else 1.0,
+        "final_perceptual_mode": str(
+            getattr(policy, "last_perceptual_state", {}).get("recommended_mode", "")
+        ) if isinstance(getattr(policy, "last_perceptual_state", {}), dict) else "",
         "world_model_delegations": int(getattr(policy, "world_model_delegations", 0)),
         "goal_hypotheses": len(getattr(policy, "goals", [])),
         "predictive_summary": (
@@ -289,10 +301,21 @@ def run_suite(
             "spatial_plan_actions": sum(int(x.get("spatial_plan_actions", 0)) for x in results),
             "spatial_plan_mismatches": sum(int(x.get("spatial_plan_mismatches", 0)) for x in results),
             "visual_packet_calls": sum(int(x.get("visual_packet_calls", 0)) for x in results),
+            "multiview_calls": sum(int(x.get("multiview_calls", 0)) for x in results),
+            "frontier_fallback_actions": sum(int(x.get("frontier_fallback_actions", 0)) for x in results),
+            "frontier_known_states": sum(int(x.get("frontier_known_states", 0)) for x in results),
             "visual_candidate_selections": sum(int(x.get("visual_candidate_selections", 0)) for x in results),
             "visual_goal_updates": sum(int(x.get("visual_goal_updates", 0)) for x in results),
             "visual_affordance_observations": sum(int(x.get("visual_affordance_observations", 0)) for x in results),
             "visual_expectation_mismatches": sum(int(x.get("visual_expectation_mismatches", 0)) for x in results),
+            "mean_final_orientation_entropy": round(
+                sum(float(x.get("final_orientation_entropy", 1.0)) for x in results) / max(len(results), 1),
+                4,
+            ),
+            "perceptual_modes": {
+                mode: sum(int(x.get("final_perceptual_mode", "") == mode) for x in results)
+                for mode in sorted({str(x.get("final_perceptual_mode", "")) for x in results if x.get("final_perceptual_mode")})
+            },
             "world_model_delegations": sum(int(x.get("world_model_delegations", 0)) for x in results),
             "goal_hypotheses": sum(int(x.get("goal_hypotheses", 0)) for x in results),
         },
