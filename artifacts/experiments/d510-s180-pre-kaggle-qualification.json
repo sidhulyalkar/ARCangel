@@ -1,0 +1,15 @@
+{
+  "experiment": "D510-S180-pre-kaggle-qualification",
+  "status": "LOCAL_PASS_AWAITING_KAGGLE",
+  "build_id": "S180-FINAL-20260824-A",
+  "checks": {
+    "focused_v010_tests": "23/23 PASS",
+    "randomized_control_audits": "35000/35000 PASS",
+    "all_source_compile": "PASS",
+    "all_notebook_code_cells_compile": "PASS",
+    "embedded_source_retest": "23/23 PASS",
+    "embedded_source_compile": "PASS",
+    "parent_v009_source_byte_identity": "PASS except V010 new policy, typed hypothesis module, and policy export"
+  },
+  "next_gate": "Kaggle Save & Run must show live semantic control before private submission"
+}
