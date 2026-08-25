@@ -1,0 +1,28 @@
+{
+  "submission": "S180",
+  "build_id": "S180-FINAL-20260824-A",
+  "architecture": "V010-active-scientist",
+  "parent": "S170-FINAL-20260824-D",
+  "notebook": {
+    "filename": "ARCangel_S180_FINAL_A_ActiveScientist.ipynb",
+    "sha256": "c466eee8de350e8a1330df5290d0c8d2c54f43657d324742989c47d00fbd83f8",
+    "embedded_source_sha256": "87a63dfdbdf5e9fa496d048043c78007629dd2fd0a879889fd813267c7ca1f7d"
+  },
+  "local_qualification": {
+    "focused_tests": 23,
+    "randomized_checks": 35000,
+    "randomized_failures": 0,
+    "embedded_bundle_retest": "23/23 PASS",
+    "embedded_bundle_compile": "PASS",
+    "parent_v009_source_unchanged": true
+  },
+  "kaggle_promotion_gate": [
+    "model_failures == 0",
+    "multiview_calls >= 1",
+    "model_parse_successes >= 1",
+    "semantic_actions >= 1",
+    "model_parse_contract_errors == 0",
+    "official submission.parquet produced"
+  ],
+  "status": "awaiting-kaggle-save-run"
+}
