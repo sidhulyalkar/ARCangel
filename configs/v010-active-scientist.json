@@ -1,0 +1,11 @@
+{
+  "policy": "active_scientist",
+  "model": "vrfai/Qwen3.6-27B-FP8",
+  "predictive_history_depth": 2,
+  "current_view_side": 512,
+  "temporal_view_side": 384,
+  "min_action_confidence": 0.30,
+  "max_model_calls": null,
+  "max_tool_calls": null,
+  "notes": "V010 semantic-control qualification. Exact runtime values remain notebook-owned for Kaggle."
+}
