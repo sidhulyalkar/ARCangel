@@ -82,9 +82,6 @@ class OpenAICompatLocalAdapter(ModelAdapter):
         self.top_p = float(top_p)
         self.top_k = int(top_k) if top_k is not None else None
         self.enable_thinking = bool(enable_thinking)
-        # Keep the legacy 256px behavior by default. Vision-first policies can request
-        # a larger raster when a temporal packet contains several frames. Clamp the
-        # value so a malformed config cannot explode visual-token cost.
         self.image_side = max(128, min(int(image_side), 768))
 
     def complete(self, system: str, user: str, grid: Any | None = None) -> str:
@@ -104,16 +101,33 @@ class OpenAICompatLocalAdapter(ModelAdapter):
                     [249,60,49],[30,147,255],[136,216,241],[255,220,0],
                     [255,133,27],[146,18,49],[79,204,48],[163,86,214],
                 ], dtype=np.uint8)
-                arr = palette[np.asarray(grid, dtype=np.int64)]
-                side = int(self.image_side)
-                img = Image.fromarray(arr, mode="RGB").resize((side, side), Image.Resampling.NEAREST)
-                buf = io.BytesIO()
-                img.save(buf, format="PNG", optimize=True)
-                b64 = base64.b64encode(buf.getvalue()).decode("ascii")
-                user_content = [
-                    {"type": "text", "text": user},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-                ]
+
+                def encode_view(view_grid: Any, side: int) -> str:
+                    arr = palette[np.asarray(view_grid, dtype=np.int64)]
+                    img = Image.fromarray(arr, mode="RGB").resize((side, side), Image.Resampling.NEAREST)
+                    buf = io.BytesIO()
+                    img.save(buf, format="PNG", optimize=True)
+                    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+                user_content = [{"type": "text", "text": user}]
+                if isinstance(grid, dict) and isinstance(grid.get("views"), list):
+                    for i, view in enumerate(grid["views"][:4]):
+                        if not isinstance(view, dict) or view.get("grid") is None:
+                            continue
+                        label = str(view.get("label", f"VIEW {i+1}"))[:160]
+                        side = max(128, min(int(view.get("side", self.image_side)), 768))
+                        b64 = encode_view(view["grid"], side)
+                        user_content.extend([
+                            {"type": "text", "text": label},
+                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}", "detail": "high"}},
+                        ])
+                else:
+                    b64 = encode_view(grid, int(self.image_side))
+                    user_content.append(
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}", "detail": "high"}}
+                    )
+                if len(user_content) == 1:
+                    user_content = user
             except Exception:
                 user_content = user
 
@@ -132,7 +146,6 @@ class OpenAICompatLocalAdapter(ModelAdapter):
         if self.enable_thinking:
             payload["chat_template_kwargs"] = {"enable_thinking": True}
         r = requests.post(f"{self.base_url}/chat/completions", json=payload, timeout=self.timeout)
-        # If a text-only model rejects image content, retry with the same structured text.
         if not r.ok and grid is not None:
             payload["messages"][1]["content"] = user
             r = requests.post(f"{self.base_url}/chat/completions", json=payload, timeout=self.timeout)
