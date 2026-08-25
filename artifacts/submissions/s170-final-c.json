@@ -1,0 +1,26 @@
+{
+  "submission": "S170",
+  "build_id": "S170-FINAL-20260824-C",
+  "architecture": "V009-perceptual-scientist-frontier",
+  "notebook": {
+    "filename": "ARCangel_S170_FINAL_C_PerceptualFrontier.ipynb",
+    "sha256": "a2f64f68f092e7636b26d66fc482cb7c7de50b0530a695f6a049258a87ad72c1",
+    "embedded_source_sha256": "60a425a86ea33239f41d0156ba17d55879cf1d814ff6822ec893cd71ab41cf19"
+  },
+  "motivation": {
+    "S115_private_score": 0.1,
+    "goal": "leaderboard-contending general visual reasoning"
+  },
+  "views": {
+    "current": 512,
+    "temporal": 384
+  },
+  "local_validation": {
+    "focused_pytest": 20,
+    "perceptual_randomized": 5000,
+    "articulation_bruteforce": 1477,
+    "frontier_shortest_route": 2500,
+    "failures": 0
+  },
+  "promotion_status": "awaiting-kaggle-save-run"
+}
