@@ -1,0 +1,58 @@
+{
+  "version": "v009-perceptual-scientist-frontier",
+  "policy": "perceptual_coding",
+  "parent": "v008-visual-belief-search",
+  "model": "vrfai/Qwen3.6-27B-FP8",
+  "accelerator": "RTX Pro 6000",
+  "internet": false,
+  "predictive_history_depth": 2,
+  "reasoning_interval": 2,
+  "current_view_side": 512,
+  "temporal_view_side": 384,
+  "candidate_limit": 40,
+  "max_click_candidates": 24,
+  "vllm_limit_mm_per_prompt": {
+    "image": 2,
+    "video": 0
+  },
+  "perceptual_state": {
+    "agency_uncertainty": true,
+    "goal_entropy": true,
+    "action_effect_entropy": true,
+    "free_space_topology": true,
+    "exact_articulation_points": true,
+    "topology_delta_events": true,
+    "symmetry_scores": true,
+    "localized_symmetry_anomaly": true,
+    "temporal_cycle_detection": true,
+    "novelty_and_irreversibility": true,
+    "causal_action_track_graph": true,
+    "risk_summary": true,
+    "object_role_hypotheses": true
+  },
+  "decision_principle": {
+    "model_facing_composite_candidate_score": false,
+    "exact_candidate_registry": true,
+    "retrodict_action_helper": true,
+    "adaptive_reasoning_from_orientation_entropy": true,
+    "spatial_planning_is_optional_grounded_tool": true
+  },
+  "runtime_hardening": {
+    "disabled_vllm_kernel": "FlashInferFP8ScaledMMLinearKernel",
+    "expected_fp8_kernel": "CutlassFP8ScaledMMLinearKernel",
+    "omp_num_threads": 1,
+    "official_gateway_rerun": true,
+    "submission_parquet": true
+  },
+  "exploration_graph": {
+    "level_local_state_keys": true,
+    "grounded_real_actions_only": true,
+    "local_untested_frontier": true,
+    "safe_route_to_remote_frontier": true,
+    "min_replay_edge_confidence": 0.9,
+    "reject_game_over_edges": true,
+    "frontier_is_not_goal": true,
+    "model_failure_frontier_fallback": true,
+    "final_fallback": "D110R2 effect posterior"
+  }
+}
