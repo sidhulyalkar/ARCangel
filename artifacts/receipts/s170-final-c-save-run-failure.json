@@ -1,0 +1,32 @@
+{
+  "submission": "S170",
+  "build_id": "S170-FINAL-20260824-C",
+  "status": "save-run-failed-before-model-start",
+  "policy_executed": false,
+  "architecture_result": "not_evaluated",
+  "passed": [
+    "ACCELERATOR + MODE PASS",
+    "ARC TOOLKIT PASS",
+    "ARCANGEL RUNTIME PASS",
+    "V006 SPATIAL ENGINE SYNTHETIC PREFLIGHT PASS",
+    "V009 SYSTEMATIC FRONTIER PREFLIGHT PASS",
+    "V009 PERCEPTUAL SCIENTIST PREFLIGHT PASS",
+    "OFFICIAL GATEWAY AGENT WRAPPER PASS",
+    "VLLM PACKAGE PASS",
+    "MODEL INPUT PASS",
+    "CUDA DRIVER RUNTIME LOAD PASS",
+    "CUDA DRIVER LINKER PASS"
+  ],
+  "failure": {
+    "component": "vllm_cli_argument",
+    "argument": "--limit-mm-per-prompt",
+    "received": "{{\"image\": 2, \"video\": 0}}",
+    "error": "Value cannot be converted with json.loads",
+    "root_cause": "Notebook embedded a doubled-brace JSON literal in a subprocess argv list. Because subprocess does not perform shell unquoting, vLLM received the malformed doubled braces literally."
+  },
+  "resolution": {
+    "next_build": "S170-FINAL-20260824-D",
+    "policy_source_changed": false,
+    "fix": "Generate the argument with json.dumps({\"image\":2,\"video\":0}) and round-trip it through json.loads before launching vLLM."
+  }
+}
