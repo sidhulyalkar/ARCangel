@@ -1,0 +1,100 @@
+{
+  "version": "v012-evidence-first-coding-agent",
+  "policy": "evidence_first_coding",
+  "parent": "v011-lean-reflective-contender",
+  "architectural_status": "clean policy reset; V009-V011 retained as falsified research lineage",
+  "primary_model": "Qwen3.8-27B-FP8",
+  "accelerator": "NVIDIA RTX PRO 6000",
+  "internet": false,
+  "reasoning": {
+    "max_reasoning_rounds_per_decision": 4,
+    "max_model_calls_per_game": 200,
+    "max_tool_calls_per_game": 96,
+    "max_generation_tokens": 768,
+    "fixed_reasoning_cadence": false,
+    "candidate_registry_authority": false,
+    "normal_heuristic_fallback": false,
+    "persistent_workspace": true,
+    "immutable_full_history": true,
+    "history_falsification": true,
+    "expectation_checked_plans": true,
+    "optional_executable_world_model": true
+  },
+  "execution": {
+    "max_plan_actions": 16,
+    "multi_action_plan_requires": [
+      "plan_reliable == true",
+      "every queued action has an expectation",
+      "a history-consistent mechanic with support >= 2 OR a validated executable world model"
+    ],
+    "queue_abort_conditions": [
+      "expectation mismatch",
+      "prediction mismatch",
+      "illegal queued action",
+      "level transition",
+      "dead/stuck transition"
+    ],
+    "emergency_path": "least-used legal primitive only after model/parse/tool decision path fails; tracked separately and never considered semantic control"
+  },
+  "evidence": {
+    "ground_truth": "exact chronological frames and transitions",
+    "query_views": [
+      "exact numeric frame",
+      "lossless ASCII grid",
+      "transition before/after frames",
+      "diff summaries",
+      "action-conditioned history",
+      "optional connected components",
+      "optional deterministic perception helpers"
+    ],
+    "persistent_theory": [
+      "validated rules",
+      "history-consistent hypotheses",
+      "falsified hypotheses",
+      "open questions",
+      "level notes",
+      "world_model_code plus validation receipt"
+    ]
+  },
+  "campaign": {
+    "workers": 28,
+    "max_actions_per_game_safety_ceiling": 900,
+    "max_resets": 2,
+    "shared_play_budget_seconds": 25200,
+    "per_game_budget_seconds": 7800,
+    "intent": "Spend actions only on progress or unresolved discriminating experiments; convert learned mechanics into short verified execution queues."
+  },
+  "vllm": {
+    "max_model_len": 16384,
+    "gpu_memory_utilization": 0.92,
+    "max_num_seqs": 28,
+    "limit_mm_per_prompt": {
+      "image": 2,
+      "video": 0
+    },
+    "disabled_kernel": "FlashInferFP8ScaledMMLinearKernel"
+  },
+  "promotion_gate": {
+    "software": [
+      "V012 architectural tests pass",
+      "repository preflight passes",
+      "exact Kaggle notebook is deterministically generated and verified"
+    ],
+    "authority": [
+      "model_authored_actions > emergency_transport_fallbacks",
+      "emergency_transport_fallbacks is near zero",
+      "no inherited candidate/frontier/effect policy owns normal actions"
+    ],
+    "science": [
+      "history queries occur on ambiguous games",
+      "at least one hypothesis is falsified or history-confirmed on a diagnostic campaign",
+      "expectation checks occur on model-authored plans",
+      "queued plans stop on contradiction"
+    ],
+    "performance": [
+      "do not submit to scarce leaderboard slot until Duck/Qwen3.8 reproduction control establishes a credible ~2-point runtime lane",
+      "V012 must materially exceed the 0.17 S190A failure before promotion",
+      "compare solved levels, action efficiency, model calls per level, and emergency ownership rather than parser metrics alone"
+    ]
+  }
+}
