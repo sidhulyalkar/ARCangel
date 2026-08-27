@@ -38,6 +38,7 @@ def probe(action_id=1, **extra):
         "analysis_python": "",
         "hypothesis": {},
         "workspace_patch": {},
+        "supports": [],
         "plan": [
             {
                 "id": action_id,
@@ -54,6 +55,25 @@ def probe(action_id=1, **extra):
     return payload
 
 
+def grounded_hypothesis(workspace, hypothesis_id="grounded"):
+    record = workspace.upsert_hypothesis(
+        {
+            "id": hypothesis_id,
+            "kind": "mechanic",
+            "claim": f"{hypothesis_id} controls are stable",
+            "confidence": 0.8,
+        },
+        step=0,
+    )
+    assert record is not None
+    workspace.record_falsification(
+        hypothesis_id,
+        {"consistent": True, "support": 3, "contradictions": 0},
+        step=0,
+    )
+    return record
+
+
 def test_workspace_falsification_separates_theory_from_ground_truth():
     workspace = EvidenceWorkspace()
     record = workspace.upsert_hypothesis(
@@ -62,7 +82,9 @@ def test_workspace_falsification_separates_theory_from_ground_truth():
             "kind": "mechanic",
             "claim": "ACTION1 always moves the controlled entity left",
             "confidence": 0.8,
-            "test_python": "result={'consistent': False, 'support': 2, 'contradictions': 1}",
+            "test_python": (
+                "result={'consistent': False, 'support': 2, 'contradictions': 1}"
+            ),
         },
         step=3,
     )
@@ -75,6 +97,30 @@ def test_workspace_falsification_separates_theory_from_ground_truth():
     assert workspace.hypotheses["move-left"].status == "falsified"
     assert workspace.hypotheses["move-left"].confidence <= 0.2
     assert "ACTION1 always moves the controlled entity left" in workspace.falsified_rules
+
+
+def test_model_workspace_patch_cannot_self_certify_rules():
+    workspace = EvidenceWorkspace()
+    workspace.apply_patch(
+        {
+            "validated_add": ["I declare this true"],
+            "falsified_add": ["I declare this false"],
+            "questions": ["what evidence distinguishes the theories?"],
+        },
+        step=4,
+    )
+    assert workspace.validated_rules == []
+    assert workspace.falsified_rules == []
+    assert workspace.open_questions == ["what evidence distinguishes the theories?"]
+
+
+def test_progress_promotes_only_explicitly_supporting_hypotheses():
+    workspace = EvidenceWorkspace()
+    grounded_hypothesis(workspace, "used")
+    grounded_hypothesis(workspace, "unrelated")
+    workspace.validate_from_progress(level=0, step=8, supporting_ids=["used"])
+    assert workspace.hypotheses["used"].status == "validated"
+    assert workspace.hypotheses["unrelated"].status == "history_consistent"
 
 
 def test_v012_model_probe_has_no_normal_heuristic_fallback():
@@ -92,9 +138,14 @@ def test_v012_can_analyze_history_then_act_without_spending_environment_action()
         [
             {
                 "mode": "ANALYZE",
-                "analysis_python": "result={'frames': frame_count, 'transitions': transition_count}",
+                "analysis_python": (
+                    "result={'frames': frame_count, 'transitions': transition_count}"
+                ),
                 "hypothesis": {},
-                "workspace_patch": {"questions": ["which primitive changes gameplay state?"]},
+                "workspace_patch": {
+                    "questions": ["which primitive changes gameplay state?"]
+                },
+                "supports": [],
                 "plan": [],
                 "plan_reliable": False,
                 "goal": "",
@@ -122,7 +173,10 @@ def test_hypothesis_test_runs_against_evidence_before_probe():
                     "kind": "mechanic",
                     "claim": "ACTION1 has not contradicted a movement hypothesis",
                     "confidence": 0.7,
-                    "test_python": "result={'consistent': True, 'support': 2, 'contradictions': 0}",
+                    "test_python": (
+                        "result={'consistent': True, 'support': 2, "
+                        "'contradictions': 0}"
+                    ),
                 },
             )
         ]
@@ -135,13 +189,14 @@ def test_hypothesis_test_runs_against_evidence_before_probe():
     assert record.support == 2
 
 
-def test_long_plan_requires_grounding_and_expectations():
+def test_long_plan_requires_explicit_grounded_support_and_expectations():
     policy = EvidenceFirstCodingPolicy(model=None)
     scene = build_scene(Frame(grid(), actions=(1, 2, 3, 4)), step=0)
     parsed = {
         "mode": "EXECUTE",
         "plan_reliable": True,
         "reason": "known route",
+        "supports": ["controls"],
         "plan": [
             {"id": 1, "expect": {"board_change": "any"}},
             {"id": 2, "expect": {"board_change": "any"}},
@@ -149,22 +204,33 @@ def test_long_plan_requires_grounding_and_expectations():
     }
     assert len(policy._parse_plan(parsed, scene)) == 1
 
-    record = policy.workspace.upsert_hypothesis(
-        {"id": "grounded", "kind": "mechanic", "claim": "controls are stable", "confidence": 0.8},
-        step=0,
-    )
-    assert record is not None
-    policy.workspace.record_falsification(
-        "grounded", {"consistent": True, "support": 3, "contradictions": 0}, step=0
-    )
-    assert len(policy._parse_plan(parsed, scene)) == 2
+    grounded_hypothesis(policy.workspace, "unrelated")
+    assert len(policy._parse_plan(parsed, scene)) == 1
+
+    grounded_hypothesis(policy.workspace, "controls")
+    accepted = policy._parse_plan(parsed, scene)
+    assert len(accepted) == 2
+    assert accepted[0].supports == ("controls",)
+
+    parsed_without_expectation = {
+        **parsed,
+        "plan": [
+            {"id": 1, "expect": {"board_change": "any"}},
+            {"id": 2},
+        ],
+    }
+    assert len(policy._parse_plan(parsed_without_expectation, scene)) == 1
 
 
 def test_expectation_mismatch_clears_queued_plan_and_forces_repair():
     policy = EvidenceFirstCodingPolicy(model=None)
     first = policy.observe(Frame(grid(), actions=(1, 2, 3, 4)))
     policy.last_action = policy._parse_one(
-        {"id": 1}, first.available_actions, first.grid.shape, 0.8, "test"
+        {"id": 1},
+        first.available_actions,
+        first.grid.shape,
+        0.8,
+        "test",
     )
     assert policy.last_action is not None
     policy.pending_expectation = {"board_change": "yes", "game_over": False}
@@ -173,6 +239,7 @@ def test_expectation_mismatch_clears_queued_plan_and_forces_repair():
             {
                 "mode": "EXECUTE",
                 "plan_reliable": False,
+                "supports": [],
                 "plan": [{"id": 2, "expect": {"board_change": "any"}}],
             },
             first,
@@ -185,13 +252,88 @@ def test_expectation_mismatch_clears_queued_plan_and_forces_repair():
     assert policy.workspace.open_questions
 
 
+def test_expected_no_change_does_not_cancel_remaining_plan():
+    policy = EvidenceFirstCodingPolicy(model=None)
+    first = policy.observe(Frame(grid(), actions=(1, 2, 3, 4)))
+    spec = policy._parse_one(
+        {"id": 1},
+        first.available_actions,
+        first.grid.shape,
+        0.8,
+        "test no-op",
+    )
+    assert spec is not None
+    policy.last_action = spec
+    policy.pending_expectation = {"board_change": "no", "game_over": False}
+    policy.plan_queue.append(
+        policy._parse_plan(
+            {
+                "mode": "EXECUTE",
+                "plan_reliable": False,
+                "supports": [],
+                "plan": [{"id": 2, "expect": {"board_change": "any"}}],
+            },
+            first,
+        )[0]
+    )
+    policy.observe(Frame(grid(), actions=(1, 2, 3, 4)))
+    assert policy.expectation_mismatches == 0
+    assert len(policy.plan_queue) == 1
+
+
+def test_level_delta_expectation_uses_pre_action_level():
+    policy = EvidenceFirstCodingPolicy(model=None)
+    first = policy.observe(Frame(grid(), actions=(1, 2), level=0))
+    spec = policy._parse_one(
+        {"id": 1},
+        first.available_actions,
+        first.grid.shape,
+        0.8,
+        "finish level",
+    )
+    assert spec is not None
+    policy.last_action = spec
+    policy.pending_expectation = {
+        "board_change": "any",
+        "level_delta": 1,
+        "game_over": False,
+    }
+    policy.observe(Frame(grid((6, 2)), actions=(1, 2), level=1))
+    assert policy.expectation_checks == 1
+    assert policy.expectation_mismatches == 0
+
+
+def test_successful_level_promotes_only_plan_supports():
+    policy = EvidenceFirstCodingPolicy(model=None)
+    grounded_hypothesis(policy.workspace, "route")
+    grounded_hypothesis(policy.workspace, "spectator")
+    first = policy.observe(Frame(grid(), actions=(1, 2), level=0))
+    spec = policy._parse_one(
+        {"id": 1},
+        first.available_actions,
+        first.grid.shape,
+        0.8,
+        "finish using route",
+    )
+    assert spec is not None
+    policy.last_action = spec
+    policy.pending_expectation = {"level_delta": 1, "game_over": False}
+    policy.pending_support_ids = ("route",)
+    policy.observe(Frame(grid((6, 2)), actions=(1, 2), level=1))
+    assert policy.workspace.hypotheses["route"].status == "validated"
+    assert policy.workspace.hypotheses["spectator"].status == "history_consistent"
+
+
 def test_world_model_code_must_report_checked_history_and_zero_mismatches():
     model = FakeModel(
         [
             {
                 **probe(1),
                 "workspace_patch": {
-                    "world_model_code": "result={'checked': 3, 'mismatches': 0, 'claim': 'toy verified model'}"
+                    "world_model_code": (
+                        "result={'checked': 3, 'mismatches': 0, "
+                        "'claim': 'toy verified model'}"
+                    )
                 },
             }
         ]
@@ -202,3 +344,21 @@ def test_world_model_code_must_report_checked_history_and_zero_mismatches():
     assert validation["status"] == "validated"
     assert validation["checked"] == 3
     assert validation["mismatches"] == 0
+
+
+def test_probe_telemetry_counts_only_the_executed_probe():
+    model = FakeModel(
+        [
+            {
+                **probe(1),
+                "plan": [
+                    {"id": 1, "expect": {"board_change": "any"}},
+                    {"id": 2, "expect": {"board_change": "any"}},
+                ],
+            }
+        ]
+    )
+    policy = EvidenceFirstCodingPolicy(model=model, max_model_calls=4, max_tool_calls=0)
+    policy.choose(policy.observe(Frame(grid(), actions=(1, 2))))
+    assert policy.model_authored_actions == 1
+    assert policy.model_authored_probes == 1
