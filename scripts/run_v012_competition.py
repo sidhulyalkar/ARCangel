@@ -110,7 +110,6 @@ def main() -> None:
         temperature=0.0,
     )
 
-    # Fail fast on the exact model/template/vision path before the scorecard is opened.
     import numpy as np
 
     smoke = np.zeros((8, 8), dtype=np.int8)
@@ -150,7 +149,9 @@ def main() -> None:
                 snapshot = list(policies.values())
             model_calls = sum(int(getattr(p, "model_calls", 0)) for p in snapshot)
             authored = sum(int(getattr(p, "model_authored_actions", 0)) for p in snapshot)
-            emergency = sum(int(getattr(p, "emergency_transport_fallbacks", 0)) for p in snapshot)
+            emergency = sum(
+                int(getattr(p, "emergency_transport_fallbacks", 0)) for p in snapshot
+            )
             mismatches = sum(int(getattr(p, "expectation_mismatches", 0)) for p in snapshot)
             print(
                 "ARCANGEL V012 HEARTBEAT"
@@ -187,13 +188,20 @@ def main() -> None:
         print("campaign diagnostics:", json.dumps(diag, sort_keys=True), flush=True)
         print(
             "evidence diagnostics:",
-            json.dumps({k: v for k, v in evidence.items() if k != "per_game"}, sort_keys=True),
+            json.dumps(
+                {key: value for key, value in evidence.items() if key != "per_game"},
+                sort_keys=True,
+            ),
             flush=True,
         )
-        if int(diag.get("model_failures", 0)) != 0:
-            raise RuntimeError("V012 campaign had model transport failures; inspect receipt and vLLM log")
+        if int(evidence.get("model_failures", 0)) != 0:
+            raise RuntimeError(
+                "V012 campaign had model transport failures; inspect receipt and vLLM log"
+            )
         if evidence["model_authored_actions"] <= evidence["emergency_transport_fallbacks"]:
-            raise RuntimeError("V012 semantic authority gate failed: emergency path owns too many actions")
+            raise RuntimeError(
+                "V012 semantic authority gate failed: emergency path owns too many actions"
+            )
         print(f"V012 CAMPAIGN PASS: {BUILD_ID}", flush=True)
     finally:
         stop.set()
