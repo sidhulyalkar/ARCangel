@@ -8,6 +8,12 @@
     "fallback_requires_explicit_control_run": "Qwen3.6-27B-FP8",
     "silent_model_fallback_allowed": false
   },
+  "notebook": {
+    "filename": "ARCangel_S190A_V011_Qwen38.ipynb",
+    "sha256": "fb07e87031e75109acd863665502267d8aeefb33768003e7e0b2d835bc4f6154",
+    "embedded_source_sha256": "bbd7ddc08babc486bddeecb2ecfa9c803fa5495337d6372f36a0831ac434f370",
+    "static_verification": "PASS on Python 3.11 and Python 3.12 CI lanes"
+  },
   "hypothesis": "A stronger multimodal base model plus a lean model-led semantic interface, compact persistent reflection, exact verification, and bounded inference will improve hidden transfer while reducing fallback ownership and timeout risk.",
   "runtime": {
     "workers": 28,
@@ -33,6 +39,6 @@
     "official submission artifact generated",
     "saved run finishes with substantial runtime headroom"
   ],
-  "artifact_state": "source-and-runner-ready; exact Kaggle notebook hash pending Save & Run packaging",
-  "private_submission_recommendation": "Do not spend the private slot until the exact saved Kaggle version passes the promotion gate."
+  "artifact_state": "exact notebook statically verified; Kaggle RTX Save & Run qualification pending",
+  "private_submission_recommendation": "Run this exact S190A notebook next. Submit its saved Kaggle version only if the runtime and semantic promotion gates pass."
 }
