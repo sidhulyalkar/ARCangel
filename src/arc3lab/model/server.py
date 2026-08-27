@@ -10,7 +10,11 @@ from typing import Iterable
 
 
 def discover_model_path(roots: Iterable[str] = ("/kaggle/input",)) -> str | None:
-    """Find a plausible local Qwen model without relying on a Kaggle dataset slug."""
+    """Find the strongest plausible local Qwen 27B FP8 model without relying on a dataset slug.
+
+    The scorer intentionally prefers the newer Qwen3.8 family when both 3.8 and 3.6 snapshots
+    are mounted, while remaining compatible with the already-qualified Qwen3.6 runtime.
+    """
     candidates: list[tuple[int, Path]] = []
     for root in roots:
         p = Path(root)
@@ -21,11 +25,14 @@ def discover_model_path(roots: Iterable[str] = ("/kaggle/input",)) -> str | None
                 data = json.loads(cfg.read_text(encoding="utf-8"))
             except Exception:
                 continue
-            text = (str(cfg.parent) + " " + json.dumps(data)[:2000]).lower()
+            text = (str(cfg.parent) + " " + json.dumps(data)[:4000]).lower()
+            normalized = "".join(ch for ch in text if ch.isalnum())
             score = 0
-            score += 5 if "qwen" in text else 0
-            score += 3 if "27b" in text or '"27"' in text else 0
-            score += 2 if "fp8" in text else 0
+            score += 8 if "qwen" in text else 0
+            score += 5 if "qwen38" in normalized else 0
+            score += 2 if "qwen36" in normalized else 0
+            score += 4 if "27b" in text or '"27"' in text else 0
+            score += 3 if "fp8" in text else 0
             score += 1 if any((cfg.parent / n).exists() for n in ("tokenizer.json", "tokenizer_config.json")) else 0
             candidates.append((score, cfg.parent))
     if not candidates:
@@ -42,8 +49,17 @@ def launch_vllm(
     max_model_len: int = 16384,
     gpu_memory_utilization: float = 0.92,
     timeout: float = 300.0,
+    limit_mm_per_prompt: dict[str, int] | None = None,
+    max_num_seqs: int | None = None,
+    log_path: str | Path | None = None,
 ) -> subprocess.Popen:
-    """Launch a local vLLM OpenAI server and wait until /v1/models responds."""
+    """Launch a local vLLM OpenAI server and wait until /v1/models responds.
+
+    Multimodal limits are serialized with json.dumps into one argv element. This deliberately
+    prevents the doubled-brace subprocess bug that invalidated S170 FINAL C. When log_path is
+    supplied, server output is retained so Kaggle startup failures are diagnosable instead of
+    disappearing into DEVNULL.
+    """
     import requests
 
     cmd = [
@@ -63,11 +79,42 @@ def launch_vllm(
         "--trust-remote-code",
         "--enable-prefix-caching",
     ]
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, env=os.environ.copy())
+    if limit_mm_per_prompt is not None:
+        mm_arg = json.dumps(
+            {str(k): int(v) for k, v in limit_mm_per_prompt.items()},
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        # Fail before model loading if the launch argument is ever malformed again.
+        json.loads(mm_arg)
+        cmd.extend(["--limit-mm-per-prompt", mm_arg])
+    if max_num_seqs is not None:
+        cmd.extend(["--max-num-seqs", str(max(1, int(max_num_seqs)))])
+
+    log_handle = None
+    stdout: int | object = subprocess.DEVNULL
+    if log_path is not None:
+        path = Path(log_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        log_handle = path.open("w", encoding="utf-8")
+        stdout = log_handle
+
+    proc = subprocess.Popen(
+        cmd,
+        stdout=stdout,
+        stderr=subprocess.STDOUT,
+        env=os.environ.copy(),
+    )
+    if log_handle is not None:
+        # Keep the parent-side handle alive for the lifetime of the subprocess.
+        setattr(proc, "_arcangel_log_handle", log_handle)
+
     deadline = time.time() + timeout
     url = f"http://127.0.0.1:{port}/v1/models"
     while time.time() < deadline:
         if proc.poll() is not None:
+            if log_handle is not None:
+                log_handle.flush()
             raise RuntimeError(f"vLLM exited early with code {proc.returncode}")
         try:
             if requests.get(url, timeout=2).ok:
@@ -76,4 +123,6 @@ def launch_vllm(
             pass
         time.sleep(2)
     proc.terminate()
+    if log_handle is not None:
+        log_handle.flush()
     raise TimeoutError(f"vLLM did not become ready at {url}")
