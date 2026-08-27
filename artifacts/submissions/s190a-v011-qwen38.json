@@ -1,0 +1,44 @@
+{
+  "submission": "S190A",
+  "build_id": "S190A-V011-QWEN38-20260826",
+  "architecture": "V011-lean-reflective-contender",
+  "parent": "S180-FINAL-20260824-A",
+  "model": {
+    "preferred": "Qwen3.8-27B-FP8",
+    "fallback_requires_explicit_control_run": "Qwen3.6-27B-FP8",
+    "silent_model_fallback_allowed": false
+  },
+  "notebook": {
+    "filename": "ARCangel_S190A_V011_Qwen38.ipynb",
+    "sha256": "fb07e87031e75109acd863665502267d8aeefb33768003e7e0b2d835bc4f6154",
+    "embedded_source_sha256": "bbd7ddc08babc486bddeecb2ecfa9c803fa5495337d6372f36a0831ac434f370",
+    "static_verification": "PASS on Python 3.11 and Python 3.12 CI lanes"
+  },
+  "hypothesis": "A stronger multimodal base model plus a lean model-led semantic interface, compact persistent reflection, exact verification, and bounded inference will improve hidden transfer while reducing fallback ownership and timeout risk.",
+  "runtime": {
+    "workers": 28,
+    "shared_play_budget_seconds": 25200,
+    "per_game_budget_seconds": 7800,
+    "max_actions_per_game": 1000,
+    "max_model_calls_per_game": 160,
+    "max_tool_calls_per_game": 24,
+    "heartbeat_seconds": 60,
+    "retain_vllm_log": true,
+    "vllm_multimodal_arg": "{\"image\":2,\"video\":0}"
+  },
+  "pre_private_promotion_gate": [
+    "exact S190A build marker",
+    "Qwen3.8 27B FP8 identity pass",
+    "vLLM starts on RTX PRO 6000 with FlashInfer FP8 unsafe path disabled if required by installed vLLM",
+    "two-image generation pass",
+    "dynamic public diagnostic has zero harness/model failures",
+    "model_parse_contract_errors == 0",
+    "semantic_actions >= 1",
+    "semantic actions demonstrably distinct from emergency fallback",
+    "reflection_updates >= 1 or goal_proposals >= 1",
+    "official submission artifact generated",
+    "saved run finishes with substantial runtime headroom"
+  ],
+  "artifact_state": "exact notebook statically verified; Kaggle RTX Save & Run qualification pending",
+  "private_submission_recommendation": "Run this exact S190A notebook next. Submit its saved Kaggle version only if the runtime and semantic promotion gates pass."
+}

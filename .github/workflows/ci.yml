@@ -8,6 +8,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
     steps:
@@ -17,6 +18,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install -e '.[dev]'
       - run: python scripts/build_kaggle_notebooks.py
+      - run: python scripts/verify_s190a_notebook.py kaggle/ARCangel_S190A_V011_Qwen38.ipynb
+      - uses: actions/upload-artifact@v4
+        if: matrix.python-version == '3.11'
+        with:
+          name: s190a-kaggle-notebook
+          path: kaggle/ARCangel_S190A_V011_Qwen38.ipynb
+          if-no-files-found: error
       - run: PYTHONPATH=src python scripts/preflight.py
       - run: python -m pytest -q
       - run: python -m ruff check src scripts tests

@@ -1,0 +1,68 @@
+{
+  "version": "v011-lean-reflective-contender",
+  "policy": "lean_reflective_scientist",
+  "parent": "v010-active-scientist",
+  "primary_model": "Qwen3.8-27B-FP8",
+  "qualified_fallback_model": "Qwen3.6-27B-FP8",
+  "accelerator": "NVIDIA RTX PRO 6000",
+  "internet": false,
+  "reasoning": {
+    "bootstrap_reasoning_steps": 5,
+    "reasoning_interval": 3,
+    "min_action_confidence": 0.2,
+    "max_model_calls_per_game": 160,
+    "max_tool_calls_per_game": 24,
+    "max_generation_tokens": 320,
+    "predictive_history_depth": 2,
+    "persistent_reflection": true,
+    "reflection_rule_limit": 10
+  },
+  "vision": {
+    "current_view_side": 512,
+    "temporal_view_side": 384,
+    "images_per_prompt": 2,
+    "candidate_limit": 24,
+    "max_click_candidates": 18
+  },
+  "campaign": {
+    "workers": 28,
+    "max_actions_per_game_safety_ceiling": 1000,
+    "max_resets": 2,
+    "shared_play_budget_seconds": 25200,
+    "per_game_budget_seconds": 7800,
+    "intent": "Finish naturally when solved; hard limits exist to preserve submission completion and leave Kaggle packaging headroom."
+  },
+  "vllm": {
+    "max_model_len": 16384,
+    "gpu_memory_utilization": 0.92,
+    "max_num_seqs": 28,
+    "limit_mm_per_prompt": {
+      "image": 2,
+      "video": 0
+    },
+    "prefix_caching": true,
+    "retain_server_log": true
+  },
+  "promotion_gate": {
+    "runtime": [
+      "vLLM starts with canonical JSON multimodal argument",
+      "model smoke succeeds on the selected mounted model",
+      "dynamic public smoke completes with zero harness errors",
+      "official submission.parquet is produced",
+      "Save & Run finishes below Kaggle's competition runtime ceiling"
+    ],
+    "semantic_control": [
+      "model_parse_successes >= 1",
+      "semantic_actions >= 1",
+      "semantic_actions > emergency_fallback_actions on the diagnostic slice",
+      "model_parse_contract_errors == 0",
+      "reflection_updates >= 1 or goal_proposals >= 1",
+      "model_failures == 0"
+    ],
+    "efficiency": [
+      "model_calls / environment_actions is materially below the S170 3/4 smoke ratio after bootstrap",
+      "no game consumes its full model-call budget without either a level completion or a documented stall",
+      "campaign leaves at least 90 minutes of notebook headroom"
+    ]
+  }
+}

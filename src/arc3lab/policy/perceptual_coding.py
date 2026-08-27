@@ -122,6 +122,11 @@ class PerceptualDecisionPolicy(VisualDecisionPolicy):
         }
 
     def _visual_context(self, scene: Scene, candidates: list[DecisionCandidate]) -> dict[str, Any]:
+        # Normal execution reaches this method only after observe(), which populates self.grids.
+        # Keep the helper robust for direct diagnostic use by seeding the current scene if a
+        # caller asks for visual context before the first observed frame.
+        if not self.grids:
+            self.grids.append(scene.grid.copy())
         context = super()._visual_context(scene, candidates)
         records = []
         for candidate in sorted(candidates, key=lambda c: c.candidate_id)[: self.candidate_limit]:
