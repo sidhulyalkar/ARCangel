@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from typing import Any
 
 
@@ -111,14 +111,29 @@ class EvidenceWorkspace:
                 record.confidence = max(record.confidence, 0.70)
         self.revision += 1
 
-    def validate_from_progress(self, *, level: int, step: int, note: str = "") -> None:
-        """Promote history-consistent high-confidence rules after real progress.
+    def validate_from_progress(
+        self,
+        *,
+        level: int,
+        step: int,
+        supporting_ids: list[str] | None = None,
+        note: str = "",
+    ) -> None:
+        """Promote only explicitly implicated history-consistent rules after progress.
 
-        Level completion does not prove every active theory, but it is strong evidence
-        that the currently retained high-confidence mechanics deserve cross-level reuse.
+        A level completion is evidence for theories that actually supported the executed
+        plan, not a blanket proof of every current hypothesis. If no support IDs were
+        attached to the successful plan, the event is retained as a level note only.
         """
-        for record in self.hypotheses.values():
-            if record.status == "history_consistent" and record.confidence >= 0.65:
+        supported = {str(value) for value in (supporting_ids or []) if str(value)}
+        for hypothesis_id in supported:
+            record = self.hypotheses.get(hypothesis_id)
+            if (
+                record is not None
+                and record.status == "history_consistent"
+                and record.support >= 2
+                and record.confidence >= 0.65
+            ):
                 record.status = "validated"
                 record.last_step = int(step)
                 self._append_unique(self.validated_rules, record.claim)
@@ -127,11 +142,15 @@ class EvidenceWorkspace:
         self.revision += 1
 
     def apply_patch(self, patch: Any, *, step: int) -> None:
+        """Apply model-authored notes without allowing self-certification.
+
+        The model may record questions/notes and propose executable model source. It
+        cannot directly insert a rule into validated or falsified stores. Those states
+        are owned by historical tests and observed progress.
+        """
         if not isinstance(patch, dict):
             return
         for key, target in (
-            ("validated_add", self.validated_rules),
-            ("falsified_add", self.falsified_rules),
             ("questions", self.open_questions),
             ("level_notes", self.level_notes),
         ):
@@ -156,8 +175,26 @@ class EvidenceWorkspace:
         if isinstance(result, dict):
             self.world_model_validation = {**result, "step": int(step)}
         else:
-            self.world_model_validation = {"status": "invalid", "result": str(result)[:500], "step": int(step)}
+            self.world_model_validation = {
+                "status": "invalid",
+                "result": str(result)[:500],
+                "step": int(step),
+            }
         self.revision += 1
+
+    def grounded(self, hypothesis_ids: list[str]) -> bool:
+        """Return whether every explicitly cited support has survived history."""
+        if not hypothesis_ids:
+            return False
+        for hypothesis_id in hypothesis_ids:
+            record = self.hypotheses.get(str(hypothesis_id))
+            if record is None:
+                return False
+            if record.status not in {"history_consistent", "validated"}:
+                return False
+            if record.support < 2 or record.contradictions > 0:
+                return False
+        return True
 
     def _append_unique(self, target: list[str], value: str) -> None:
         lowered = value.lower()
@@ -185,7 +222,12 @@ class EvidenceWorkspace:
             record.record()
             for record in sorted(
                 self.hypotheses.values(),
-                key=lambda h: (h.status == "validated", h.status == "history_consistent", h.confidence, h.last_step),
+                key=lambda h: (
+                    h.status == "validated",
+                    h.status == "history_consistent",
+                    h.confidence,
+                    h.last_step,
+                ),
                 reverse=True,
             )
             if record.status != "falsified"
