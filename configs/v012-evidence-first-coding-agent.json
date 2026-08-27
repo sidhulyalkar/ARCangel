@@ -17,6 +17,7 @@
     "persistent_workspace": true,
     "immutable_full_history": true,
     "history_falsification": true,
+    "model_can_self_validate_rules": false,
     "expectation_checked_plans": true,
     "optional_executable_world_model": true
   },
@@ -25,15 +26,14 @@
     "multi_action_plan_requires": [
       "plan_reliable == true",
       "every queued action has an expectation",
-      "a history-consistent mechanic with support >= 2 OR a validated executable world model"
+      "all explicitly cited supporting hypothesis IDs are history-consistent with support >= 2 OR a validated executable world model"
     ],
     "queue_abort_conditions": [
-      "expectation mismatch",
-      "prediction mismatch",
+      "model-authored expectation mismatch",
       "illegal queued action",
-      "level transition",
-      "dead/stuck transition"
+      "level transition"
     ],
+    "no_change_policy": "A no-change transition does not cancel a plan when the model explicitly predicted no change; generic stuck heuristics do not own V012 queue control.",
     "emergency_path": "least-used legal primitive only after model/parse/tool decision path fails; tracked separately and never considered semantic control"
   },
   "evidence": {
@@ -48,9 +48,9 @@
       "optional deterministic perception helpers"
     ],
     "persistent_theory": [
-      "validated rules",
+      "validated rules promoted only from evidence-tested plan supports after real progress",
       "history-consistent hypotheses",
-      "falsified hypotheses",
+      "falsified hypotheses produced only by historical contradiction tests",
       "open questions",
       "level notes",
       "world_model_code plus validation receipt"
@@ -88,6 +88,7 @@
     "science": [
       "history queries occur on ambiguous games",
       "at least one hypothesis is falsified or history-confirmed on a diagnostic campaign",
+      "multi-action plans cite the exact hypotheses that justify them",
       "expectation checks occur on model-authored plans",
       "queued plans stop on contradiction"
     ],
