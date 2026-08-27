@@ -23,6 +23,7 @@ from arc3lab.types import ActionSpec, Scene, Transition
 class PlannedAction:
     spec: ActionSpec
     expect: dict[str, Any]
+    supports: tuple[str, ...] = ()
 
 
 class EvidenceFirstCodingPolicy(CodingPolicy):
@@ -42,7 +43,6 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
         max_plan_actions: int = 16,
         **kwargs: Any,
     ) -> None:
-        # reasoning_interval is inherited but V012 does not use cadence-based fallback.
         kwargs.setdefault("reasoning_interval", 1)
         super().__init__(
             *args,
@@ -55,6 +55,7 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
         self.workspace = EvidenceWorkspace()
         self.plan_queue: list[PlannedAction] = []
         self.pending_expectation: dict[str, Any] | None = None
+        self.pending_support_ids: tuple[str, ...] = ()
         self.expectation_checks = 0
         self.expectation_mismatches = 0
         self.hypothesis_tests = 0
@@ -74,6 +75,7 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
         super().on_level_reset()
         self.plan_queue.clear()
         self.pending_expectation = None
+        self.pending_support_ids = ()
 
     @staticmethod
     def _decode_result(text: str) -> Any:
@@ -101,6 +103,8 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
         expect: dict[str, Any],
         transition: Transition,
         scene: Scene,
+        *,
+        previous_level: int,
     ) -> tuple[bool, list[str]]:
         reasons: list[str] = []
         board_change = str(expect.get("board_change", "any")).lower()
@@ -113,7 +117,7 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
         if expect.get("level_delta") is not None:
             try:
                 wanted = int(expect["level_delta"])
-                actual = int(scene.level - transition.level)
+                actual = int(scene.level - previous_level)
                 if actual != wanted:
                     reasons.append(f"level_delta {actual} != {wanted}")
             except Exception:
@@ -143,13 +147,20 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
     def observe(self, frame: Any) -> Scene:
         previous_level = self.level
         pending_expectation = self.pending_expectation
+        pending_support_ids = self.pending_support_ids
         scene = super().observe(frame)
 
+        expectation_matched = True
         if pending_expectation is not None and self.memory.transitions:
             latest = self.memory.transitions[-1]
             self.expectation_checks += 1
-            matched, reasons = self._expectation_matches(pending_expectation, latest, scene)
-            if not matched:
+            expectation_matched, reasons = self._expectation_matches(
+                pending_expectation,
+                latest,
+                scene,
+                previous_level=previous_level,
+            )
+            if not expectation_matched:
                 self.expectation_mismatches += 1
                 self.plan_queue.clear()
                 self.action_queue.clear()
@@ -158,12 +169,14 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
                 self.workspace.apply_patch(
                     {
                         "questions": [
-                            "Repair the action model after expectation mismatch: " + "; ".join(reasons)
+                            "Repair the action model after expectation mismatch: "
+                            + "; ".join(reasons)
                         ]
                     },
                     step=self.step,
                 )
             self.pending_expectation = None
+            self.pending_support_ids = ()
 
         if scene.level > previous_level:
             self.plan_queue.clear()
@@ -171,12 +184,9 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
             self.workspace.validate_from_progress(
                 level=previous_level,
                 step=self.step,
+                supporting_ids=list(pending_support_ids) if expectation_matched else [],
                 note=self.last_reason or "level completed under current evidence model",
             )
-        if self.stuck > 0:
-            # A queued action producing no meaningful effect is new evidence. Re-ground
-            # rather than letting a stale plan continue through a dead transition.
-            self.plan_queue.clear()
         return scene
 
     def _full_evidence_context(self, scene: Scene) -> dict[str, Any]:
@@ -283,30 +293,50 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
             if ok and isinstance(result, dict):
                 checked = int(result.get("checked", 0) or 0)
                 mismatches = int(result.get("mismatches", 0) or 0)
-                result = {**result, "status": "validated" if checked > 0 and mismatches == 0 else "rejected"}
+                status = "validated" if checked > 0 and mismatches == 0 else "rejected"
+                result = {**result, "status": status}
                 self.workspace.set_world_model_validation(result, step=self.step)
                 feedback.append(f"WORLD MODEL CHECK: {raw}")
             else:
                 self.world_model_validation_failures += 1
-                self.workspace.set_world_model_validation({"status": "invalid", "detail": raw}, step=self.step)
+                self.workspace.set_world_model_validation(
+                    {"status": "invalid", "detail": raw},
+                    step=self.step,
+                )
                 feedback.append(f"WORLD MODEL CHECK FAILED: {raw}")
         return feedback
+
+    @staticmethod
+    def _support_ids(parsed: dict[str, Any]) -> tuple[str, ...]:
+        raw = parsed.get("supports")
+        if not isinstance(raw, list):
+            return ()
+        return tuple(dict.fromkeys(str(value).strip() for value in raw if str(value).strip()))
 
     def _parse_plan(self, parsed: dict[str, Any], scene: Scene) -> list[PlannedAction]:
         raw_plan = parsed.get("plan")
         if not isinstance(raw_plan, list):
             return []
         confidence = 0.82 if bool(parsed.get("plan_reliable", False)) else 0.58
-        reason = str(parsed.get("reason") or parsed.get("goal") or "V012 model-authored action")[:500]
+        reason = str(
+            parsed.get("reason") or parsed.get("goal") or "V012 model-authored action"
+        )[:500]
+        supports = self._support_ids(parsed)
         plan: list[PlannedAction] = []
         for raw in raw_plan[: self.max_plan_actions]:
             if not isinstance(raw, dict):
                 continue
-            spec = self._parse_one(raw, scene.available_actions, scene.grid.shape, confidence, reason)
+            spec = self._parse_one(
+                raw,
+                scene.available_actions,
+                scene.grid.shape,
+                confidence,
+                reason,
+            )
             if spec is None:
                 continue
             expect = raw.get("expect") if isinstance(raw.get("expect"), dict) else {}
-            plan.append(PlannedAction(spec=spec, expect=dict(expect)))
+            plan.append(PlannedAction(spec=spec, expect=dict(expect), supports=supports))
 
         if len(plan) <= 1:
             return plan
@@ -317,12 +347,13 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
             and int(validation.get("checked", 0) or 0) > 0
             and int(validation.get("mismatches", 0) or 0) == 0
         )
-        history_grounded = any(
-            h.status in {"history_consistent", "validated"} and h.support >= 2
-            for h in self.workspace.hypotheses.values()
-        )
+        supports_grounded = self.workspace.grounded(list(supports))
         all_expected = all(bool(step.expect) for step in plan)
-        if not bool(parsed.get("plan_reliable", False)) or not all_expected or not (model_validated or history_grounded):
+        if (
+            not bool(parsed.get("plan_reliable", False))
+            or not all_expected
+            or not (model_validated or supports_grounded)
+        ):
             return plan[:1]
         return plan
 
@@ -334,7 +365,10 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
             self.analysis_rounds += 1
             parsed = self._call_evidence_model(user, scene)
             if not isinstance(parsed, dict):
-                user += "\nPrevious response was not valid JSON. Return the compact V012 JSON contract."
+                user += (
+                    "\nPrevious response was not valid JSON. "
+                    "Return the compact V012 JSON contract."
+                )
                 continue
             self.last_mode = str(parsed.get("mode", "")).upper().strip()
             self.last_reason = str(parsed.get("reason", ""))[:500]
@@ -344,23 +378,26 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
             if isinstance(program, str) and program.strip() and self._tool_budget_available():
                 ok, _result, raw = self._run_tool(program, scene)
                 feedback.append(("ANALYSIS: " if ok else "ANALYSIS FAILED: ") + raw)
-                user += "\n\n" + TOOL_FOLLOWUP_TEMPLATE.format(tool_result="\n".join(feedback))
+                user += "\n\n" + TOOL_FOLLOWUP_TEMPLATE.format(
+                    tool_result="\n".join(feedback)
+                )
                 continue
 
             plan = self._parse_plan(parsed, scene)
             if plan:
-                self.model_authored_actions += len(plan)
                 if self.last_mode == "PROBE":
                     plan = plan[:1]
                     self.model_authored_probes += 1
                 else:
                     self.model_authored_plan_actions += len(plan)
+                self.model_authored_actions += len(plan)
                 return plan
 
             self.no_plan_rounds += 1
             user += (
-                "\nNo executable action was produced. If another historical query is necessary, ANALYZE it now. "
-                "Otherwise choose exactly one legal discriminating PROBE."
+                "\nNo executable action was produced. If another historical query is "
+                "necessary, ANALYZE it now. Otherwise choose exactly one legal "
+                "discriminating PROBE."
             )
         return []
 
@@ -371,17 +408,43 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
         simple = [a for a in valid if int(a) in {1, 2, 3, 4, 5, 7}]
         if simple:
             counts = {
-                int(a): sum(int(t.action.action_id) == int(a) for t in self.memory.transitions)
+                int(a): sum(
+                    int(transition.action.action_id) == int(a)
+                    for transition in self.memory.transitions
+                )
                 for a in simple
             }
             action_id = min(simple, key=lambda a: (counts[int(a)], int(a)))
-            return ActionSpec(int(action_id), reason="V012 emergency transport fallback", confidence=0.05)
+            return ActionSpec(
+                int(action_id),
+                reason="V012 emergency transport fallback",
+                confidence=0.05,
+            )
         if 6 in valid:
             row = int(scene.grid.shape[0] // 2)
             col = int(scene.grid.shape[1] // 2)
-            return ActionSpec(6, x=col, y=row, reason="V012 emergency transport fallback", confidence=0.02)
+            return ActionSpec(
+                6,
+                x=col,
+                y=row,
+                reason="V012 emergency transport fallback",
+                confidence=0.02,
+            )
         action_id = int(valid[0]) if valid else 0
-        return ActionSpec(action_id, reason="V012 emergency transport fallback", confidence=0.01)
+        return ActionSpec(
+            action_id,
+            reason="V012 emergency transport fallback",
+            confidence=0.01,
+        )
+
+    def _arm_planned_action(self, scene: Scene, planned: PlannedAction, *, queued: bool) -> ActionSpec:
+        spec = planned.spec
+        self.pending_expectation = dict(planned.expect)
+        self.pending_support_ids = tuple(planned.supports)
+        self.last_action, self.last_target_shape = spec, None
+        self.queued_actions_used += int(queued)
+        self._arm_prediction(scene, spec)
+        return spec
 
     def choose(self, scene: Scene) -> ActionSpec:
         while self.plan_queue:
@@ -398,23 +461,17 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
             ):
                 self.plan_queue.clear()
                 break
-            self.pending_expectation = dict(planned.expect)
-            self.last_action, self.last_target_shape = spec, None
-            self.queued_actions_used += 1
-            self._arm_prediction(scene, spec)
-            return spec
+            return self._arm_planned_action(scene, planned, queued=True)
 
         plan = self._reason(scene)
         if plan:
             first, rest = plan[0], plan[1:]
             self.plan_queue.extend(rest)
-            self.pending_expectation = dict(first.expect)
-            self.last_action, self.last_target_shape = first.spec, None
-            self._arm_prediction(scene, first.spec)
-            return first.spec
+            return self._arm_planned_action(scene, first, queued=False)
 
         spec = self._emergency_action(scene)
-        self.pending_expectation = {"board_change": "any", "game_over": False}
+        self.pending_expectation = {"board_change": "any"}
+        self.pending_support_ids = ()
         self.last_action, self.last_target_shape = spec, None
         self._arm_prediction(scene, spec)
         return spec
