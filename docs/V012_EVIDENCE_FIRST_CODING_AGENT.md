@@ -6,6 +6,8 @@ V012 is a clean policy-level architectural reset after S190A / V011 scored **0.1
 
 That score is treated as falsification evidence, not as a tuning signal. The V009 → V010 → V011 lineage remains in the repository for research continuity, but V012 deliberately removes its main authority structure.
 
+V012 is **software-qualified but not behaviorally promoted**. It should not consume a scarce leaderboard slot until the public Duck/Qwen3.8 control establishes a healthy runtime/model lane and a Kaggle Save & Run demonstrates that the evidence-first controller actually solves levels efficiently.
+
 ## Why V011 was rejected
 
 S190A ran successfully, used the intended Qwen3.8-27B-FP8 model family, and still scored near baseline. The failure therefore cannot be explained away as deployment plumbing.
@@ -21,7 +23,7 @@ The key architectural problems were:
 
 ## External evidence informing the reset
 
-The first ARC-AGI-3 milestone winner, Tufa Labs' Duck, uses a lightweight Python-driven harness and lets the model choose which representation and computation matter. ARC Prize's milestone write-up explicitly notes that Tufa found hand-built tools could hurt. The current public Qwen3.8 Duck notebook has reached 2.23 on Kaggle using RTX Pro 6000, ARC3 vLLM H100 Wheelhouse V3 and Qwen3.8 27B FP8.
+The first ARC-AGI-3 milestone winner, Tufa Labs' Duck, uses a lightweight Python-driven harness and lets the model choose which representation and computation matter. ARC Prize's milestone write-up notes that Tufa found hand-built tools could hurt. The current public Qwen3.8 Duck notebook has reached the multi-point leaderboard regime on RTX Pro 6000 using the current ARC3 vLLM wheelhouse and Qwen3.8 27B FP8 family.
 
 Recent public research systems point in the same direction at a different compute/model scale:
 
@@ -34,7 +36,7 @@ V012 does not copy game-specific rules from any public solver. It extracts the a
 
 > The immutable interaction ledger is ground truth. Everything else is a provisional interpretation.
 
-The agent therefore separates two stores:
+The agent therefore separates two stores.
 
 ### Evidence store
 
@@ -49,6 +51,8 @@ Append-only exact information:
 - optional deterministic component views;
 - action-conditioned transition queries.
 
+Frame conversion for Python analysis is **lazy**: V012 converts only the exact historical frame requested by a tool query instead of rebuilding the complete nested-list history on every analysis call. This matters under long histories and 28 concurrent game workers.
+
 ### Scientific workspace
 
 Mutable theory:
@@ -60,6 +64,8 @@ Mutable theory:
 - open questions;
 - level notes;
 - optional executable world-model source plus its validation receipt.
+
+The model may propose hypotheses, tests, questions, notes and world-model code. It may **not self-certify** a hypothesis as validated or falsified. Those states are owned by historical evidence and observed progress.
 
 The theory can be revised. The evidence cannot.
 
@@ -93,7 +99,8 @@ update evidence and falsify/confirm theory
 when mechanics are grounded:
 write/search a short plan
       ↓
-attach expectation to every action
+name the exact supporting hypotheses
++ attach expectation to every action
       ↓
 execute until expectation mismatch
       ↓
@@ -136,9 +143,21 @@ result = {
 }
 ```
 
-A contradiction marks the hypothesis falsified and sharply reduces its authority.
+A contradiction marks the hypothesis falsified and sharply reduces its authority. A consistent hypothesis gains `history_consistent` status, but repeated consistency is still distinct from proving that the rule caused success.
 
 This is intentionally stronger than confidence bookkeeping. A confident model does not get to override contradictory recorded evidence.
+
+## Evidence-owned validation
+
+The workspace deliberately rejects model-authored attempts to write directly into `validated_rules` or `falsified_rules`.
+
+A hypothesis is promoted to `validated` only when:
+
+1. it already survived historical testing with at least two supporting observations and no contradiction;
+2. the model explicitly named that hypothesis ID in the `supports` list for the action/plan that made real level progress;
+3. the associated action expectation did not contradict the observed result.
+
+A level completion therefore does **not** blanket-promote every attractive theory in memory. Unrelated hypotheses remain merely history-consistent.
 
 ## Executable world model
 
@@ -163,9 +182,9 @@ A multi-action plan is accepted only when all of the following hold:
 
 1. the model explicitly marks the plan reliable;
 2. every queued action carries an expectation;
-3. either a mechanic has survived at least two compatible historical observations, or an executable world model has passed its historical validation.
+3. the plan either cites exact hypothesis IDs in `supports`, **all** of which are history-consistent/validated with support ≥ 2 and zero contradictions, or it relies on an executable world model that has passed historical validation.
 
-Otherwise V012 truncates the proposal to one action.
+An unrelated grounded hypothesis cannot unlock a plan. If these conditions are not satisfied, V012 truncates the proposal to one action.
 
 ## Expectation checking
 
@@ -185,13 +204,15 @@ After the environment responds, V012 compares observation to expectation. Any mi
 - records an open repair question;
 - prevents stale execution from consuming more score.
 
+Importantly, **generic no-change detection does not own the queue**. A legitimate wait, toggle, delayed effect or latent-state action may intentionally cause no visible change. If the model explicitly predicted `board_change: no`, that transition does not cancel the remaining plan.
+
 ## Fallback policy
 
 V012 has **no normal heuristic fallback authority**.
 
 If the model/parse path is exhausted, a minimal emergency transport fallback exists solely to keep the runner contract alive. It is tracked separately as `emergency_transport_fallbacks` and is a promotion failure if it owns a meaningful fraction of actions.
 
-This distinction matters. V011's fallback was part of cognition. V012's emergency fallback is treated as an infrastructure defect signal.
+This distinction matters. V011's fallback was part of cognition. V012's emergency fallback is treated as an infrastructure/model-contract defect signal.
 
 ## Useful legacy code that survives
 
@@ -245,11 +266,11 @@ V012 is not promoted merely because it compiles.
 
 ### S200 — public control
 
-First reproduce the current Duck + Qwen3.8 lane through our runtime. The point is not to claim originality. It establishes that our deployment/model/action plumbing can reach the current public ~2-point regime.
+First run the current public Duck + Qwen3.8 notebook essentially unchanged through Kaggle Copy & Edit. Reimplementing it inside ARCangel would contaminate the control with our prompts, wrappers and scheduling. The purpose is to establish that the same broad Kaggle/model family can reach the current multi-point public regime on our account/runtime.
 
 ### S210A — V012 evidence-first
 
-Run the packaged architecture and compare against the control using:
+Only after S200 is healthy, run the packaged V012 architecture and compare against the control using:
 
 - levels solved;
 - leaderboard score;
@@ -265,13 +286,24 @@ Run the packaged architecture and compare against the control using:
 
 Only one major capability should change per experiment:
 
-1. evidence ledger + direct model authority;
+1. direct model authority + complete evidence access;
 2. + history falsification;
-3. + persistent cross-level playbook;
+3. + persistent cross-level evidence-tested playbook;
 4. + optional executable world model;
 5. + adaptive compute allocation.
 
 If an addition reduces score, remove it even if it looks intellectually attractive.
+
+## Qualification layers
+
+V012 distinguishes four independent standards:
+
+1. **Software qualification** — code, tests, notebook generation, embedded source verification and runtime preflight work as specified.
+2. **Scientific qualification** — hypotheses are actually tested, contradictions change theory, and plans are tied to evidence.
+3. **Behavioral qualification** — public/diagnostic games are solved with meaningful action efficiency and low emergency ownership.
+4. **Leaderboard qualification** — the exact saved Kaggle artifact earns a competitive score.
+
+Passing a lower layer never implies the next one.
 
 ## Promotion standard
 
@@ -279,8 +311,9 @@ A V012 submission is credible only if:
 
 - model-authored actions overwhelmingly dominate emergency actions;
 - the notebook/runtime path is fully qualified;
+- hypotheses and world models are constrained by real history rather than self-certification;
+- long plans are explicitly bound to the evidence that justifies them;
 - the architecture materially exceeds S190A's 0.17;
-- ideally it first beats the public-control reproduction on at least some game families;
 - improvements are visible in task-level outcomes, not merely telemetry.
 
 The project objective is no longer to build the most elaborate ARC agent.
