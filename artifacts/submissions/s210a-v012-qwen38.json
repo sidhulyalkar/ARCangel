@@ -1,0 +1,74 @@
+{
+  "build_id": "S210A-V012-EVIDENCE-FIRST-QWEN38-20260827",
+  "architecture": "V012 Evidence-First Coding Agent",
+  "branch": "agent/v012-evidence-first-coding-agent",
+  "pull_request": 16,
+  "qualified_head_sha": "9e658e896cbecc6c581fcd0f15acca9408bab3f9",
+  "notebook": {
+    "filename": "ARCangel_S210A_V012_EvidenceFirst_Qwen38.ipynb",
+    "sha256": "4a75f95d30284f926e19421e196ea1fb9ca0544decbcbbfedeb15b5b0e0b5b9c",
+    "embedded_source_sha256": "f09676db0cfe186f8b3ab0f4ab7ed60a333a2edf5a74a73325af873941a100f5",
+    "github_actions_artifact_id": 9660367564,
+    "github_actions_artifact_name": "s210a-v012-kaggle-notebook"
+  },
+  "ci_qualification": {
+    "workflow_run_id": 33105760474,
+    "python_3_11": {
+      "notebook_build": "PASS",
+      "notebook_verification": "PASS",
+      "artifact_upload": "PASS",
+      "repository_preflight": "PASS",
+      "pytest": "PASS"
+    },
+    "python_3_12": {
+      "notebook_build": "PASS",
+      "notebook_verification": "PASS",
+      "repository_preflight": "PASS",
+      "pytest": "PASS"
+    },
+    "pytest_result": "103 passed",
+    "overall_ci": "RED because repository-wide Ruff debt remains; do not represent CI as green",
+    "ruff_status": "inherited repository-wide lint debt; not a V012 notebook/runtime qualification failure"
+  },
+  "runtime": {
+    "accelerator": "NVIDIA RTX PRO 6000",
+    "internet": false,
+    "model": "Qwen3.8 27B FP8 Repacked",
+    "wheelhouse": "ARC3 vLLM H100 Wheelhouse V3",
+    "workers": 28,
+    "max_actions_per_game": 900,
+    "max_resets": 2,
+    "max_model_calls_per_game": 200,
+    "max_tool_calls_per_game": 96,
+    "max_reasoning_rounds_per_decision": 4,
+    "max_queued_plan_actions": 16,
+    "shared_time_budget_seconds": 25200,
+    "per_game_time_budget_seconds": 7800,
+    "generation_token_ceiling": 768,
+    "multimodal_limit": {
+      "image": 2,
+      "video": 0
+    },
+    "disabled_kernel": "FlashInferFP8ScaledMMLinearKernel"
+  },
+  "architectural_gates": {
+    "candidate_registry_authority": false,
+    "normal_heuristic_fallback_authority": false,
+    "immutable_full_history": true,
+    "persistent_provisional_workspace": true,
+    "history_falsification": true,
+    "model_self_validation": false,
+    "exact_support_bound_long_plans": true,
+    "expectation_checked_execution": true,
+    "optional_historically_validated_world_model": true,
+    "emergency_transport_path_tracked_separately": true
+  },
+  "artifact_state": "EXACT NOTEBOOK STATICALLY/SOFTWARE QUALIFIED; BEHAVIORAL AND LEADERBOARD QUALIFICATION PENDING",
+  "experiment_order": [
+    "S200: Copy & Edit and run the current public Duck + Qwen3.8 control essentially unchanged.",
+    "If S200 reaches the expected multi-point public regime, run this exact S210A notebook in Kaggle Save & Run.",
+    "Inspect S210A receipt for model-authored action ownership, history tests, expectation checks, emergency fallback rate, solved levels, action efficiency, and valid submission.parquet.",
+    "Only submit S210A to the scarce leaderboard slot if those behavioral gates are healthy."
+  ],
+  "promotion_recommendation": "DO NOT infer competitiveness from software qualification. S190A scored 0.17. Establish S200 control first, then run S210A as the first evidence-first behavioral experiment."
+}

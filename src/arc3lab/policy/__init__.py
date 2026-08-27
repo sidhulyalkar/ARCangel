@@ -1,6 +1,7 @@
 from arc3lab.policy.active_scientist import ActiveScientistPolicy
 from arc3lab.policy.coding import CodingPolicy
 from arc3lab.policy.effect_posterior import EffectPosteriorPolicy
+from arc3lab.policy.evidence_first import EvidenceFirstCodingPolicy
 from arc3lab.policy.hybrid import HybridPolicy
 from arc3lab.policy.lean_scientist import LeanReflectiveScientistPolicy
 from arc3lab.policy.perceptual_coding import PerceptualDecisionPolicy
@@ -13,6 +14,7 @@ __all__ = [
     "ActiveScientistPolicy",
     "CodingPolicy",
     "EffectPosteriorPolicy",
+    "EvidenceFirstCodingPolicy",
     "HybridPolicy",
     "LeanReflectiveScientistPolicy",
     "PerceptualDecisionPolicy",

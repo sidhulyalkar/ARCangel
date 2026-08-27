@@ -19,11 +19,13 @@ jobs:
       - run: python -m pip install -e '.[dev]'
       - run: python scripts/build_kaggle_notebooks.py
       - run: python scripts/verify_s190a_notebook.py kaggle/ARCangel_S190A_V011_Qwen38.ipynb
+      - run: python scripts/build_v012_notebook.py
+      - run: python scripts/verify_v012_notebook.py kaggle/ARCangel_S210A_V012_EvidenceFirst_Qwen38.ipynb
       - uses: actions/upload-artifact@v4
         if: matrix.python-version == '3.11'
         with:
-          name: s190a-kaggle-notebook
-          path: kaggle/ARCangel_S190A_V011_Qwen38.ipynb
+          name: s210a-v012-kaggle-notebook
+          path: kaggle/ARCangel_S210A_V012_EvidenceFirst_Qwen38.ipynb
           if-no-files-found: error
       - run: PYTHONPATH=src python scripts/preflight.py
       - run: python -m pytest -q
