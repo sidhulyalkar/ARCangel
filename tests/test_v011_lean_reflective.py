@@ -74,7 +74,7 @@ def payload(**kwargs):
 
 
 def test_v011_prompt_is_model_led_and_has_structured_reflection():
-    assert "code layer is a guardrail" in LEAN_SCIENTIST_SYSTEM_PROMPT
+    assert "guardrail and calculator" in LEAN_SCIENTIST_SYSTEM_PROMPT
     assert '"reflection"' in LEAN_SCIENTIST_SYSTEM_PROMPT
     assert "Return exactly one JSON object" in LEAN_SCIENTIST_SYSTEM_PROMPT
 
