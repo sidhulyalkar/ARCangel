@@ -192,10 +192,16 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
     def _full_evidence_context(self, scene: Scene) -> dict[str, Any]:
         base = super()._sandbox_context(scene)
         compact_transitions = self._transition_records()
-        grids = [grid.tolist() for grid in self.grids]
 
         def frame(i: int = -1) -> list[list[int]]:
-            return grids[int(i)] if grids else []
+            if not self.grids:
+                return []
+            idx = int(i)
+            if idx < 0:
+                idx += len(self.grids)
+            if not 0 <= idx < len(self.grids):
+                return []
+            return self.grids[idx].tolist()
 
         def transition(i: int = -1) -> dict[str, Any]:
             if not compact_transitions:
@@ -206,21 +212,26 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
             if not 0 <= idx < len(compact_transitions):
                 return {}
             record = dict(compact_transitions[idx])
-            if idx < len(grids):
-                record["before_grid"] = grids[idx]
-            if idx + 1 < len(grids):
-                record["after_grid"] = grids[idx + 1]
+            if idx < len(self.grids):
+                record["before_grid"] = self.grids[idx].tolist()
+            if idx + 1 < len(self.grids):
+                record["after_grid"] = self.grids[idx + 1].tolist()
             return record
 
         def components_at(i: int = -1) -> list[dict[str, Any]]:
             if not self.scenes:
                 return []
-            return self._component_records(self.scenes[int(i)])
+            idx = int(i)
+            if idx < 0:
+                idx += len(self.scenes)
+            if not 0 <= idx < len(self.scenes):
+                return []
+            return self._component_records(self.scenes[idx])
 
         base.update(
             {
                 "transition_count": len(compact_transitions),
-                "frame_count": len(grids),
+                "frame_count": len(self.grids),
                 "transitions": compact_transitions,
                 "frame": frame,
                 "transition": transition,
@@ -437,7 +448,13 @@ class EvidenceFirstCodingPolicy(CodingPolicy):
             confidence=0.01,
         )
 
-    def _arm_planned_action(self, scene: Scene, planned: PlannedAction, *, queued: bool) -> ActionSpec:
+    def _arm_planned_action(
+        self,
+        scene: Scene,
+        planned: PlannedAction,
+        *,
+        queued: bool,
+    ) -> ActionSpec:
         spec = planned.spec
         self.pending_expectation = dict(planned.expect)
         self.pending_support_ids = tuple(planned.supports)
