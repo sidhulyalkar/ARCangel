@@ -1,0 +1,34 @@
+{
+  "providers": [
+    {
+      "id": "nvidia-nemotron35-lightning",
+      "base_url": "https://integrate.api.nvidia.com/v1",
+      "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "api_key_env": "NVIDIA_API_KEY",
+      "roles": ["minimalist", "runtime", "integrator"],
+      "max_tokens": 3000,
+      "timeout_seconds": 600,
+      "enabled": true
+    },
+    {
+      "id": "nvidia-deepseek-v4-pro",
+      "base_url": "https://integrate.api.nvidia.com/v1",
+      "model": "deepseek-ai/deepseek-v4-pro-0813",
+      "api_key_env": "NVIDIA_API_KEY",
+      "roles": ["scientist", "planner", "memory", "generalization"],
+      "max_tokens": 4000,
+      "timeout_seconds": 600,
+      "enabled": true
+    },
+    {
+      "id": "nvidia-glm52",
+      "base_url": "https://integrate.api.nvidia.com/v1",
+      "model": "z-ai/glm-5.2",
+      "api_key_env": "NVIDIA_API_KEY",
+      "roles": ["explorer", "vision", "red_team"],
+      "max_tokens": 4000,
+      "timeout_seconds": 600,
+      "enabled": true
+    }
+  ]
+}
