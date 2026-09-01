@@ -18,9 +18,11 @@
   "promotion": {
     "min_validation_delta": 0.02,
     "min_dev_delta": -0.01,
+    "min_blind_delta": -0.01,
     "max_emergency_fraction": 0.02,
     "max_failure_rate": 0.05,
     "min_validation_runs": 2,
+    "min_blind_runs": 2,
     "require_control": true
   },
   "contestants": [
@@ -38,6 +40,7 @@
       "role": "minimalist control",
       "description": "ARCangel's thinnest existing coding-agent lane. Internal control for architecture additions.",
       "command": ["python", "scripts/run_arena_contestant.py", "--profile", "coding-minimal", "--contestant", "{contestant}", "--split", "{split}", "--seed", "{seed}", "--result", "{result}", "--split-registry", "artifacts/arena/v013/splits.public.json"],
+      "judge_command": ["python", "scripts/run_arena_contestant.py", "--profile", "coding-minimal", "--contestant", "{contestant}", "--split", "blind", "--seed", "{seed}", "--result", "{result}", "--split-registry", "{private_registry}"],
       "enabled": true,
       "tags": ["control", "minimal", "model-led"]
     },
@@ -48,6 +51,7 @@
       "description": "Preserves the S190A controller family as a negative control rather than deleting its evidence.",
       "control_id": "B-coding-minimal",
       "command": ["python", "scripts/run_arena_contestant.py", "--profile", "v011", "--contestant", "{contestant}", "--split", "{split}", "--seed", "{seed}", "--result", "{result}", "--split-registry", "artifacts/arena/v013/splits.public.json"],
+      "judge_command": ["python", "scripts/run_arena_contestant.py", "--profile", "v011", "--contestant", "{contestant}", "--split", "blind", "--seed", "{seed}", "--result", "{result}", "--split-registry", "{private_registry}"],
       "enabled": true,
       "tags": ["negative-control", "v011"]
     },
@@ -58,6 +62,7 @@
       "description": "Full evidence-first coding agent with falsification-tested plans and expectation checking.",
       "control_id": "B-coding-minimal",
       "command": ["python", "scripts/run_arena_contestant.py", "--profile", "v012", "--contestant", "{contestant}", "--split", "{split}", "--seed", "{seed}", "--result", "{result}", "--split-registry", "artifacts/arena/v013/splits.public.json"],
+      "judge_command": ["python", "scripts/run_arena_contestant.py", "--profile", "v012", "--contestant", "{contestant}", "--split", "blind", "--seed", "{seed}", "--result", "{result}", "--split-registry", "{private_registry}"],
       "enabled": true,
       "tags": ["evidence", "falsification", "world-model"]
     },
@@ -69,6 +74,7 @@
       "parent": "D-v012-evidence-first",
       "control_id": "B-coding-minimal",
       "command": ["python", "scripts/run_arena_contestant.py", "--profile", "v012-lite", "--contestant", "{contestant}", "--split", "{split}", "--seed", "{seed}", "--result", "{result}", "--split-registry", "artifacts/arena/v013/splits.public.json"],
+      "judge_command": ["python", "scripts/run_arena_contestant.py", "--profile", "v012-lite", "--contestant", "{contestant}", "--split", "blind", "--seed", "{seed}", "--result", "{result}", "--split-registry", "{private_registry}"],
       "enabled": true,
       "tags": ["ablation", "evidence", "minimal"]
     },
