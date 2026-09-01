@@ -49,7 +49,9 @@ class ArenaOrchestrator:
                     key = (contestant.contestant_id, split, seed)
                     if not include_completed and key in completed:
                         continue
-                    result_path = self.results_dir / f"{contestant.contestant_id}__{split}__{seed}.json"
+                    result_path = self.results_dir / (
+                        f"{contestant.contestant_id}__{split}__{seed}.json"
+                    )
                     mapping = {
                         "contestant": contestant.contestant_id,
                         "split": split,
@@ -144,6 +146,45 @@ class ArenaOrchestrator:
         self.ledger.append(result)
         return result
 
+    def _internal_promoted(self, aggregates: dict) -> set[str]:
+        promoted: set[str] = set()
+        for contestant in self.manifest.contestants:
+            if not contestant.control_id:
+                continue
+            decision = promotion_decision(contestant, aggregates, self.manifest)
+            if decision.promoted:
+                promoted.add(contestant.contestant_id)
+        return promoted
+
+    def leaderboard_queue(self) -> list[dict[str, object]]:
+        """Nominate only internally promoted contestants that beat the public Kaggle control."""
+        aggregates = aggregate_results(self.ledger.read(), self.manifest)
+        control_id = self.manifest.leaderboard_control_id
+        if not control_id:
+            return []
+        control = aggregates.get((control_id, "kaggle"))
+        if control is None:
+            return []
+        internally_promoted = self._internal_promoted(aggregates)
+        queue: list[dict[str, object]] = []
+        for contestant_id in sorted(internally_promoted):
+            row = aggregates.get((contestant_id, "kaggle"))
+            if row is None:
+                continue
+            delta = row.robust_score - control.robust_score
+            if delta < self.manifest.min_leaderboard_delta:
+                continue
+            queue.append(
+                {
+                    "contestant_id": contestant_id,
+                    "control_id": control_id,
+                    "kaggle_delta": delta,
+                    "contestant_score": row.robust_score,
+                    "control_score": control.robust_score,
+                }
+            )
+        return sorted(queue, key=lambda item: float(item["kaggle_delta"]), reverse=True)
+
     def scorecard(self, *, include_blind: bool = False) -> dict[str, object]:
         results = self.ledger.read()
         if not include_blind:
@@ -157,27 +198,26 @@ class ArenaOrchestrator:
         decisions = []
         for contestant in self.manifest.contestants:
             if contestant.control_id:
-                decisions.append(asdict(promotion_decision(contestant, aggregates, self.manifest)))
+                decisions.append(
+                    asdict(promotion_decision(contestant, aggregates, self.manifest))
+                )
         return {
             "experiment_id": self.manifest.experiment_id,
             "result_count": len(results),
             "rankings": split_rankings,
             "promotion_decisions": decisions,
+            "leaderboard_control_id": self.manifest.leaderboard_control_id,
+            "leaderboard_queue": self.leaderboard_queue(),
         }
 
     def write_scorecard(self, path: str | Path, *, include_blind: bool = False) -> None:
-        Path(path).write_text(json.dumps(self.scorecard(include_blind=include_blind), indent=2) + "\n")
+        Path(path).write_text(
+            json.dumps(self.scorecard(include_blind=include_blind), indent=2) + "\n"
+        )
 
     def promotion_queue(self) -> list[str]:
         aggregates = aggregate_results(self.ledger.read(), self.manifest)
-        promoted: list[str] = []
-        for contestant in self.manifest.contestants:
-            if not contestant.control_id:
-                continue
-            decision = promotion_decision(contestant, aggregates, self.manifest)
-            if decision.promoted:
-                promoted.append(contestant.contestant_id)
-        return promoted
+        return sorted(self._internal_promoted(aggregates))
 
     def describe_plan(self, runs: Iterable[PlannedRun]) -> str:
         lines = []
