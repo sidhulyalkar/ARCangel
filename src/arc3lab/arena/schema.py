@@ -65,6 +65,8 @@ class ArenaManifest:
     timeout_seconds: int = 7200
     max_parallel: int = 1
     split_salt: str = "arcangel-v013"
+    leaderboard_control_id: str | None = None
+    min_leaderboard_delta: float = 0.0
 
     @classmethod
     def load(cls, path: str | Path) -> "ArenaManifest":
@@ -87,6 +89,12 @@ class ArenaManifest:
             timeout_seconds=max(1, int(raw.get("timeout_seconds", 7200))),
             max_parallel=max(1, int(raw.get("max_parallel", 1))),
             split_salt=str(raw.get("split_salt", "arcangel-v013")),
+            leaderboard_control_id=(
+                str(raw["leaderboard_control_id"])
+                if raw.get("leaderboard_control_id")
+                else None
+            ),
+            min_leaderboard_delta=float(raw.get("min_leaderboard_delta", 0.0)),
         )
 
 
