@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import re
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -15,6 +17,11 @@ def _clamp01(value: Any) -> float:
     except (TypeError, ValueError):
         return 0.0
     return min(1.0, max(0.0, number))
+
+
+def _slug(value: str) -> str:
+    text = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return text[:72] or "particle"
 
 
 def proposal_key(proposal: Any) -> str:
@@ -162,6 +169,8 @@ class SwarmMemory:
     def append(self, outcome: SwarmOutcome) -> None:
         if outcome.split.lower() not in {"dev", "validation"}:
             raise ValueError("swarm memory accepts DEV/VALIDATION evidence only")
+        if not math.isfinite(float(outcome.utility)):
+            raise ValueError("swarm utility must be finite")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(outcome.to_dict(), sort_keys=True) + "\n")
@@ -182,7 +191,10 @@ class SwarmMemory:
         role_best = self._best(row for row in rows if row.role_id == role_id)
         lines = [
             "# MEASURED SWARM SEARCH GUIDANCE",
-            "These are attractors for mutation, not truths. Preserve independent search and do not copy them mechanically.",
+            (
+                "These are attractors for mutation, not truths. Preserve independent search "
+                "and do not copy them mechanically."
+            ),
         ]
         for label, row in (
             ("global_best", global_best),
@@ -197,7 +209,9 @@ class SwarmMemory:
                     f"split={row.split} note={row.note[:240]}"
                 )
         lines.append(
-            "Search instruction: retain useful causal structure from measured attractors, but mutate at least one assumption, representation, or control mechanism. Prefer a small falsifiable move over convergence by imitation."
+            "Search instruction: retain useful causal structure from measured attractors, "
+            "but mutate at least one assumption, representation, or control mechanism. "
+            "Prefer a small falsifiable move over convergence by imitation."
         )
         return "\n".join(lines)
 
@@ -295,12 +309,13 @@ class SwarmCouncil:
 
     @staticmethod
     def _review_quality(review: ResearchReview) -> float:
+        # Reviewer confidence is deliberately a weak term: confidence is not evidence.
         return (
-            0.24 * review.falsifiability
-            + 0.24 * review.generalization
-            + 0.20 * review.information_gain
-            + 0.16 * review.feasibility
-            + 0.16 * review.confidence
+            0.27 * review.falsifiability
+            + 0.27 * review.generalization
+            + 0.22 * review.information_gain
+            + 0.18 * review.feasibility
+            + 0.06 * review.confidence
         )
 
     def priorities(self) -> list[SwarmPriority]:
@@ -362,6 +377,8 @@ class SwarmCouncil:
         min_reviews: int = 2,
     ) -> list[tuple[Any, SwarmPriority]]:
         limit = max(0, int(max_proposals))
+        if limit == 0:
+            return []
         priorities = {
             row.proposal_key: row
             for row in self.priorities()
@@ -410,9 +427,10 @@ class SwarmCouncil:
             self.select(max_proposals=max_proposals, min_reviews=min_reviews),
             start=1,
         ):
+            particle = _slug(f"{proposal.role_id}-{proposal.provider_id}")
             rows.append(
                 {
-                    "proposal_id": f"SWARM-{index:02d}-{proposal.role_id}-{proposal.provider_id}",
+                    "proposal_id": f"SWARM-{index:02d}-{particle}",
                     "provider_id": proposal.provider_id,
                     "role_id": proposal.role_id,
                     "hypothesis": proposal.hypothesis,
@@ -424,9 +442,7 @@ class SwarmCouncil:
                     "failure_mode": proposal.failure_mode,
                     "review": priority.to_dict(),
                     "disagreement_experiment": priority.dissent_experiment,
-                    "suggested_branch": (
-                        f"experiment/swarm-{index:02d}-{proposal.role_id}-{proposal.provider_id}"
-                    ).lower().replace("_", "-"),
+                    "suggested_branch": f"experiment/swarm-{index:02d}-{particle}",
                 }
             )
         return {
