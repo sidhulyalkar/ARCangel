@@ -37,6 +37,7 @@ def build_policy_factory(args: argparse.Namespace) -> Callable[[str], Any]:
         return int(args.seed) ^ sum((i + 1) * ord(ch) for i, ch in enumerate(game_id))
 
     if args.profile == "coding-minimal":
+
         def factory(game_id: str) -> CodingPolicy:
             return CodingPolicy(
                 model=model,
@@ -46,9 +47,11 @@ def build_policy_factory(args: argparse.Namespace) -> Callable[[str], Any]:
                 max_tool_calls=args.max_tool_calls,
                 predictive_history_depth=2,
             )
+
         return factory
 
     if args.profile == "v011":
+
         def factory(game_id: str) -> LeanReflectiveScientistPolicy:
             return LeanReflectiveScientistPolicy(
                 model=model,
@@ -58,6 +61,7 @@ def build_policy_factory(args: argparse.Namespace) -> Callable[[str], Any]:
                 reasoning_interval=3,
                 bootstrap_reasoning_steps=5,
             )
+
         return factory
 
     if args.profile in {"v012", "v012-lite"}:
@@ -73,6 +77,7 @@ def build_policy_factory(args: argparse.Namespace) -> Callable[[str], Any]:
                 max_plan_actions=8 if lite else 16,
                 predictive_history_depth=2,
             )
+
         return factory
 
     raise ValueError(f"unsupported profile: {args.profile}")
@@ -80,14 +85,21 @@ def build_policy_factory(args: argparse.Namespace) -> Callable[[str], Any]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Run one ARCangel arena contestant")
-    ap.add_argument("--profile", required=True, choices=["coding-minimal", "v011", "v012", "v012-lite"])
+    ap.add_argument(
+        "--profile",
+        required=True,
+        choices=["coding-minimal", "v011", "v012", "v012-lite"],
+    )
     ap.add_argument("--contestant", default=os.getenv("ARCANGEL_CONTESTANT_ID", ""))
     ap.add_argument("--split", default=os.getenv("ARCANGEL_SPLIT", "dev"))
     ap.add_argument("--seed", type=int, default=int(os.getenv("ARCANGEL_SEED", "20260831")))
     ap.add_argument("--result", default=os.getenv("ARCANGEL_RESULT_PATH", "arena_result.json"))
     ap.add_argument("--suite-output", default="")
     ap.add_argument("--split-registry", default=os.getenv("ARCANGEL_SPLIT_REGISTRY", ""))
-    ap.add_argument("--base-url", default=os.getenv("ARC3_MODEL_BASE_URL", "http://127.0.0.1:8000/v1"))
+    ap.add_argument(
+        "--base-url",
+        default=os.getenv("ARC3_MODEL_BASE_URL", "http://127.0.0.1:8000/v1"),
+    )
     ap.add_argument("--model", default=os.getenv("ARC3_MODEL_NAME", "arc3"))
     ap.add_argument("--max-tokens", type=int, default=768)
     ap.add_argument("--model-timeout", type=float, default=180.0)
@@ -98,6 +110,7 @@ def main() -> int:
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--time-budget-seconds", type=float, default=7200.0)
     ap.add_argument("--game-time-budget-seconds", type=float, default=1200.0)
+    ap.add_argument("--coverage-reserve-fraction", type=float, default=0.05)
     args = ap.parse_args()
 
     if not args.contestant:
@@ -121,6 +134,7 @@ def main() -> int:
         output_path=suite_output,
         time_budget_seconds=args.time_budget_seconds,
         game_time_budget_seconds=args.game_time_budget_seconds,
+        coverage_reserve_fraction=args.coverage_reserve_fraction,
     )
     result = suite_payload_to_result(
         payload,
@@ -129,6 +143,7 @@ def main() -> int:
         seed=args.seed,
         source=suite_output,
     )
+    result.metadata["runtime_budget"] = payload.get("runtime_budget", {})
     Path(args.result).parent.mkdir(parents=True, exist_ok=True)
     Path(args.result).write_text(json.dumps(result.to_dict(), indent=2) + "\n")
     print(json.dumps(result.to_dict(), indent=2))
