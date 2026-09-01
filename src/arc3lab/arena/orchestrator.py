@@ -31,6 +31,33 @@ class ArenaOrchestrator:
                 return contestant
         raise KeyError(contestant_id)
 
+    def _planned_run(
+        self,
+        contestant: ContestantSpec,
+        *,
+        command: tuple[str, ...],
+        split: str,
+        seed: int,
+        private_registry: str = "",
+    ) -> PlannedRun:
+        result_path = self.results_dir / f"{contestant.contestant_id}__{split}__{seed}.json"
+        mapping = {
+            "contestant": contestant.contestant_id,
+            "split": split,
+            "seed": str(seed),
+            "result": str(result_path),
+            "arena_root": str(self.root),
+            "private_registry": private_registry,
+        }
+        argv = tuple(token.format(**mapping) for token in command)
+        return PlannedRun(
+            contestant_id=contestant.contestant_id,
+            split=split,
+            seed=seed,
+            command=argv,
+            result_path=str(result_path),
+        )
+
     def plan(
         self,
         *,
@@ -39,36 +66,64 @@ class ArenaOrchestrator:
     ) -> list[PlannedRun]:
         completed = self.ledger.run_keys()
         runs: list[PlannedRun] = []
+        for split in splits:
+            if split == "blind":
+                raise ValueError("BLIND is judge-owned; use plan_blind() with the private registry")
+            if split not in {"dev", "validation", "kaggle"}:
+                raise ValueError(f"unsupported split: {split}")
         for contestant in self.manifest.contestants:
             if not contestant.enabled or not contestant.command:
                 continue
             for split in splits:
-                if split not in {"dev", "validation", "blind", "kaggle"}:
-                    raise ValueError(f"unsupported split: {split}")
                 for seed in self.manifest.seeds:
                     key = (contestant.contestant_id, split, seed)
                     if not include_completed and key in completed:
                         continue
-                    result_path = self.results_dir / (
-                        f"{contestant.contestant_id}__{split}__{seed}.json"
-                    )
-                    mapping = {
-                        "contestant": contestant.contestant_id,
-                        "split": split,
-                        "seed": str(seed),
-                        "result": str(result_path),
-                        "arena_root": str(self.root),
-                    }
-                    argv = tuple(token.format(**mapping) for token in contestant.command)
                     runs.append(
-                        PlannedRun(
-                            contestant_id=contestant.contestant_id,
+                        self._planned_run(
+                            contestant,
+                            command=contestant.command,
                             split=split,
                             seed=seed,
-                            command=argv,
-                            result_path=str(result_path),
                         )
                     )
+        return runs
+
+    def plan_blind(
+        self,
+        *,
+        private_registry: str | Path,
+        include_completed: bool = False,
+    ) -> list[PlannedRun]:
+        private_path = Path(private_registry)
+        if not private_path.exists():
+            raise FileNotFoundError(private_path)
+        aggregates = aggregate_results(self.ledger.read(), self.manifest)
+        promoted = self._internal_promoted(aggregates)
+        target_ids = set(promoted)
+        for contestant_id in promoted:
+            control_id = self._contestant(contestant_id).control_id
+            if control_id:
+                target_ids.add(control_id)
+        completed = self.ledger.run_keys()
+        runs: list[PlannedRun] = []
+        for contestant_id in sorted(target_ids):
+            contestant = self._contestant(contestant_id)
+            if not contestant.judge_command:
+                continue
+            for seed in self.manifest.seeds:
+                key = (contestant_id, "blind", seed)
+                if not include_completed and key in completed:
+                    continue
+                runs.append(
+                    self._planned_run(
+                        contestant,
+                        command=contestant.judge_command,
+                        split="blind",
+                        seed=seed,
+                        private_registry=str(private_path),
+                    )
+                )
         return runs
 
     def execute(self, run: PlannedRun) -> ArenaResult:
@@ -134,9 +189,14 @@ class ArenaOrchestrator:
         return result
 
     def run_all(self, *, splits: Iterable[str] = ("dev", "validation")) -> list[ArenaResult]:
-        # Serial execution is the default because local GPU contestants often contend for one device.
         results: list[ArenaResult] = []
         for run in self.plan(splits=splits):
+            results.append(self.execute(run))
+        return results
+
+    def run_blind(self, *, private_registry: str | Path) -> list[ArenaResult]:
+        results: list[ArenaResult] = []
+        for run in self.plan_blind(private_registry=private_registry):
             results.append(self.execute(run))
         return results
 
@@ -157,6 +217,12 @@ class ArenaOrchestrator:
         runtime_seconds: float | None = None,
     ) -> ArenaResult:
         self._contestant(contestant_id)
+        if contestant_id != self.manifest.leaderboard_control_id:
+            ready = {row["contestant_id"] for row in self.kaggle_ready_queue()}
+            if contestant_id not in ready:
+                raise ValueError(
+                    f"{contestant_id} has not passed internal promotion plus private BLIND qualification"
+                )
         metadata: dict[str, object] = {
             "artifact_sha256": artifact_sha256,
             "external_source": source,
@@ -185,8 +251,41 @@ class ArenaOrchestrator:
                 promoted.add(contestant.contestant_id)
         return promoted
 
+    def kaggle_ready_queue(self) -> list[dict[str, object]]:
+        """Require private BLIND evidence before an internal winner may consume a Kaggle slot."""
+        aggregates = aggregate_results(self.ledger.read(), self.manifest)
+        rules = self.manifest.promotion
+        queue: list[dict[str, object]] = []
+        for contestant_id in sorted(self._internal_promoted(aggregates)):
+            contestant = self._contestant(contestant_id)
+            if not contestant.control_id:
+                continue
+            candidate = aggregates.get((contestant_id, "blind"))
+            control = aggregates.get((contestant.control_id, "blind"))
+            if candidate is None or control is None:
+                continue
+            if candidate.runs < rules.min_blind_runs or control.runs < rules.min_blind_runs:
+                continue
+            if candidate.emergency_fraction > rules.max_emergency_fraction:
+                continue
+            if candidate.failure_rate > rules.max_failure_rate:
+                continue
+            delta = candidate.robust_score - control.robust_score
+            if delta < rules.min_blind_delta:
+                continue
+            queue.append(
+                {
+                    "contestant_id": contestant_id,
+                    "control_id": contestant.control_id,
+                    "blind_delta": delta,
+                    "candidate_runs": candidate.runs,
+                    "control_runs": control.runs,
+                }
+            )
+        return sorted(queue, key=lambda item: float(item["blind_delta"]), reverse=True)
+
     def leaderboard_queue(self) -> list[dict[str, object]]:
-        """Nominate only internally promoted contestants that beat the public Kaggle control."""
+        """Nominate only blind-qualified contestants that beat the public Kaggle control."""
         aggregates = aggregate_results(self.ledger.read(), self.manifest)
         control_id = self.manifest.leaderboard_control_id
         if not control_id:
@@ -195,9 +294,9 @@ class ArenaOrchestrator:
         if control is None or "official_score" not in control.metrics:
             return []
         control_score = float(control.metrics["official_score"])
-        internally_promoted = self._internal_promoted(aggregates)
+        ready = {row["contestant_id"] for row in self.kaggle_ready_queue()}
         queue: list[dict[str, object]] = []
-        for contestant_id in sorted(internally_promoted):
+        for contestant_id in sorted(ready):
             row = aggregates.get((contestant_id, "kaggle"))
             if row is None or "official_score" not in row.metrics:
                 continue
@@ -226,6 +325,8 @@ class ArenaOrchestrator:
             for split in ("dev", "validation", "kaggle")
             if any(row.split == split for row in results)
         }
+        if include_blind and any(row.split == "blind" for row in results):
+            split_rankings["blind"] = [asdict(item) for item in rank_split(aggregates, "blind")]
         decisions = []
         for contestant in self.manifest.contestants:
             if contestant.control_id:
