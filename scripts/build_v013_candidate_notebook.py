@@ -181,6 +181,10 @@ sys.argv = [
     "--max-tool-calls", "96",
     "--time-budget-seconds", "25200",
     "--game-time-budget-seconds", "7800",
+    "--coverage-reserve-fraction", "0.05",
+    "--notebook-limit-seconds", "32400",
+    "--setup-reserve-seconds", "3600",
+    "--expected-scored-games", "110",
     "--output", "{receipt_path}",
     "--seed", "{seed}",
 ]
@@ -198,6 +202,8 @@ print("V013 RECEIPT BUILD:", summary.get("build_id"))
 print("V013 CONTESTANT:", summary.get("contestant_id"))
 print("V013 PROFILE:", summary.get("profile"))
 print("V013 MODEL FAMILY:", summary.get("model_family"))
+print("V013 RUNTIME BUDGET:", json.dumps(summary.get("runtime_budget", {{}}), sort_keys=True))
+print("V013 COMPETITION ENVELOPE:", json.dumps(summary.get("competition_runtime_envelope", {{}}), sort_keys=True))
 print("V013 DIAGNOSTICS:", json.dumps(summary.get("diagnostics", {{}}), sort_keys=True))
 if summary.get("build_id") != "{build_id}":
     raise RuntimeError("receipt build id mismatch")
@@ -214,7 +220,9 @@ print("SUBMISSION FILE READY:", submission)
             md_cell(
                 f"# ARCangel V013 Candidate | {contestant_id}\n\n"
                 f"Build `{build_id}` using profile `{profile}`. This notebook is generated only after "
-                "the selected architecture has been evaluated through the V013 research arena.\n\n"
+                "the selected architecture has been evaluated through the V013 research arena. "
+                "The runtime reserves coverage across the full scored game set before allowing any "
+                "single difficult game to monopolize the worker pool.\n\n"
                 "Settings: RTX PRO 6000, Internet OFF. Attach ARC Prize 2026 competition input, "
                 "ARC3 vLLM H100 Wheelhouse V3, and Qwen3.8 27B FP8 Repacked."
             ),
