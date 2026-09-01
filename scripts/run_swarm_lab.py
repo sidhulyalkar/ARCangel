@@ -24,6 +24,11 @@ def validate_manifest(manifest: ArenaManifest) -> list[str]:
     known = set(ids)
     if manifest.leaderboard_control_id and manifest.leaderboard_control_id not in known:
         errors.append(f"unknown leaderboard control {manifest.leaderboard_control_id}")
+    if manifest.require_leaderboard_artifact_hash:
+        if manifest.min_leaderboard_candidate_runs < 2:
+            errors.append("strict leaderboard evidence requires at least 2 candidate runs")
+        if manifest.min_leaderboard_control_runs < 2:
+            errors.append("strict leaderboard evidence requires at least 2 control runs")
     for contestant in manifest.contestants:
         if contestant.control_id and contestant.control_id not in known:
             errors.append(
@@ -51,6 +56,9 @@ def cmd_validate(args: argparse.Namespace) -> int:
                 "enabled": sum(contestant.enabled for contestant in manifest.contestants),
                 "seeds": list(manifest.seeds),
                 "leaderboard_control_id": manifest.leaderboard_control_id,
+                "leaderboard_candidate_runs": manifest.min_leaderboard_candidate_runs,
+                "leaderboard_control_runs": manifest.min_leaderboard_control_runs,
+                "leaderboard_confidence_se": manifest.leaderboard_confidence_se,
                 "status": "VALID",
             },
             indent=2,
@@ -156,6 +164,16 @@ def cmd_kaggle_ready(args: argparse.Namespace) -> int:
     return 0 if queue else 2
 
 
+def cmd_leaderboard_evidence(args: argparse.Namespace) -> int:
+    _, lab = load_lab(args)
+    payload = lab.leaderboard_evidence()
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, indent=2) + "\n")
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
 def cmd_leaderboard(args: argparse.Namespace) -> int:
     _, lab = load_lab(args)
     queue = lab.leaderboard_queue()
@@ -230,7 +248,7 @@ def parser() -> argparse.ArgumentParser:
     ingest_suite.add_argument(
         "--split",
         required=True,
-        choices=["dev", "validation", "blind", "kaggle"],
+        choices=["dev", "validation", "blind"],
     )
     ingest_suite.add_argument("--seed", required=True, type=int)
 
@@ -254,6 +272,12 @@ def parser() -> argparse.ArgumentParser:
 
     ready = sub.add_parser("kaggle-ready")
     ready.add_argument("--output", default="artifacts/arena/v013/kaggle-ready.json")
+
+    evidence = sub.add_parser("leaderboard-evidence")
+    evidence.add_argument(
+        "--output",
+        default="artifacts/arena/v013/leaderboard-evidence.json",
+    )
 
     leaderboard = sub.add_parser("leaderboard")
     leaderboard.add_argument(
@@ -301,6 +325,8 @@ def main() -> int:
         return cmd_promote(args)
     if args.command == "kaggle-ready":
         return cmd_kaggle_ready(args)
+    if args.command == "leaderboard-evidence":
+        return cmd_leaderboard_evidence(args)
     if args.command == "leaderboard":
         return cmd_leaderboard(args)
     if args.command == "split":
