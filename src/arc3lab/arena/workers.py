@@ -74,8 +74,8 @@ class ExperimentWorker:
     """Run one coding-agent experiment inside an isolated git worktree.
 
     The worker never pushes or merges. A successful experiment becomes a local branch/commit
-    that must still enter the arena and beat its declared control. Failed worktrees are removed
-    after their receipt is written.
+    that must still enter the arena and beat its declared control. Failed worktrees and their
+    temporary branches are removed so the same proposal can be retried cleanly.
     """
 
     def __init__(
@@ -242,6 +242,11 @@ class ExperimentWorker:
                     ["git", "worktree", "remove", "--force", str(worktree)],
                     cwd=self.repo_root,
                     timeout=120.0,
+                )
+                self._run(
+                    ["git", "branch", "-D", branch],
+                    cwd=self.repo_root,
+                    timeout=60.0,
                 )
 
 
