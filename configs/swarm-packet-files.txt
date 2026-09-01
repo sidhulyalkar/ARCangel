@@ -9,6 +9,9 @@ src/arc3lab/arena/scoring.py
 src/arc3lab/arena/orchestrator.py
 src/arc3lab/arena/metrics.py
 src/arc3lab/arena/research_packet.py
+src/arc3lab/arena/research_agents.py
+src/arc3lab/arena/evolution.py
+src/arc3lab/arena/workers.py
 src/arc3lab/policy/evidence_first.py
 src/arc3lab/policy/evidence_workspace.py
 src/arc3lab/policy/evidence_prompt.py
