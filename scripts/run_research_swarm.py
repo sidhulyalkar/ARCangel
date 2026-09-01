@@ -6,6 +6,7 @@ from pathlib import Path
 
 from arc3lab.arena.orchestrator import ArenaOrchestrator
 from arc3lab.arena.research_agents import ResearchSwarm
+from arc3lab.arena.research_context import build_research_scorecard
 from arc3lab.arena.schema import ArenaManifest
 from arc3lab.arena.swarm_intelligence import SwarmMemory
 
@@ -17,7 +18,7 @@ def build_context(
     *,
     max_chars: int,
 ) -> str:
-    sections = ["# CURRENT ARENA SCORECARD\n" + json.dumps(scorecard, indent=2)]
+    sections = ["# DEV/VALIDATION RESEARCH SCORECARD\n" + json.dumps(scorecard, indent=2)]
     used = len(sections[0])
     for line in include_list.read_text().splitlines():
         rel = line.strip()
@@ -80,7 +81,7 @@ def main() -> int:
         return 0
 
     lab = ArenaOrchestrator(manifest, args.arena_root)
-    scorecard = lab.scorecard(include_blind=False)
+    scorecard = build_research_scorecard(lab)
     context = build_context(
         Path(args.repo_root),
         Path(args.include_list),
@@ -100,6 +101,7 @@ def main() -> int:
         "valid": sum(proposal.valid for proposal in proposals),
         "invalid": sum(not proposal.valid for proposal in proposals),
         "memory_outcomes": len(memory.read()),
+        "research_evidence_scope": scorecard["evidence_scope"],
         "proposal_files": [f"{proposal.provider_id}__{proposal.role_id}.json" for proposal in proposals],
     }
     print(json.dumps(summary, indent=2))
