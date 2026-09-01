@@ -146,6 +146,35 @@ class ArenaOrchestrator:
         self.ledger.append(result)
         return result
 
+    def record_kaggle_score(
+        self,
+        *,
+        contestant_id: str,
+        score: float,
+        seed: int,
+        source: str,
+        artifact_sha256: str = "",
+        runtime_seconds: float | None = None,
+    ) -> ArenaResult:
+        self._contestant(contestant_id)
+        metadata: dict[str, object] = {
+            "artifact_sha256": artifact_sha256,
+            "external_source": source,
+        }
+        if runtime_seconds is not None:
+            metadata["runtime_seconds"] = float(runtime_seconds)
+        result = ArenaResult(
+            contestant_id=contestant_id,
+            split="kaggle",
+            seed=seed,
+            metrics={"official_score": float(score)},
+            status="ok",
+            source=source,
+            metadata=metadata,
+        )
+        self.ledger.append(result)
+        return result
+
     def _internal_promoted(self, aggregates: dict) -> set[str]:
         promoted: set[str] = set()
         for contestant in self.manifest.contestants:
@@ -163,15 +192,17 @@ class ArenaOrchestrator:
         if not control_id:
             return []
         control = aggregates.get((control_id, "kaggle"))
-        if control is None:
+        if control is None or "official_score" not in control.metrics:
             return []
+        control_score = float(control.metrics["official_score"])
         internally_promoted = self._internal_promoted(aggregates)
         queue: list[dict[str, object]] = []
         for contestant_id in sorted(internally_promoted):
             row = aggregates.get((contestant_id, "kaggle"))
-            if row is None:
+            if row is None or "official_score" not in row.metrics:
                 continue
-            delta = row.robust_score - control.robust_score
+            contestant_score = float(row.metrics["official_score"])
+            delta = contestant_score - control_score
             if delta < self.manifest.min_leaderboard_delta:
                 continue
             queue.append(
@@ -179,8 +210,8 @@ class ArenaOrchestrator:
                     "contestant_id": contestant_id,
                     "control_id": control_id,
                     "kaggle_delta": delta,
-                    "contestant_score": row.robust_score,
-                    "control_score": control.robust_score,
+                    "contestant_score": contestant_score,
+                    "control_score": control_score,
                 }
             )
         return sorted(queue, key=lambda item: float(item["kaggle_delta"]), reverse=True)
