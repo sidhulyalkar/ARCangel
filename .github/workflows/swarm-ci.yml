@@ -10,6 +10,8 @@ on:
       - 'scripts/run_first_tournament.py'
       - 'scripts/run_v013_campaign.py'
       - 'scripts/run_research_swarm.py'
+      - 'scripts/run_swarm_council.py'
+      - 'scripts/record_swarm_outcome.py'
       - 'scripts/init_swarm_splits.py'
       - 'scripts/plan_research_round.py'
       - 'scripts/run_experiment_workers.py'
@@ -32,6 +34,8 @@ on:
       - 'scripts/run_first_tournament.py'
       - 'scripts/run_v013_campaign.py'
       - 'scripts/run_research_swarm.py'
+      - 'scripts/run_swarm_council.py'
+      - 'scripts/record_swarm_outcome.py'
       - 'scripts/init_swarm_splits.py'
       - 'scripts/plan_research_round.py'
       - 'scripts/run_experiment_workers.py'
@@ -75,6 +79,8 @@ jobs:
           scripts/run_first_tournament.py
           scripts/run_v013_campaign.py
           scripts/run_research_swarm.py
+          scripts/run_swarm_council.py
+          scripts/record_swarm_outcome.py
           scripts/init_swarm_splits.py
           scripts/plan_research_round.py
           scripts/run_experiment_workers.py
@@ -92,6 +98,8 @@ jobs:
           scripts/run_first_tournament.py
           scripts/run_v013_campaign.py
           scripts/run_research_swarm.py
+          scripts/run_swarm_council.py
+          scripts/record_swarm_outcome.py
           scripts/init_swarm_splits.py
           scripts/plan_research_round.py
           scripts/run_experiment_workers.py
