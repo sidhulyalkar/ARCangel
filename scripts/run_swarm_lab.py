@@ -31,6 +31,8 @@ def validate_manifest(manifest: ArenaManifest) -> list[str]:
             )
         if contestant.parent and contestant.parent not in known:
             errors.append(f"{contestant.contestant_id}: unknown parent {contestant.parent}")
+        if contestant.enabled and contestant.control_id and not contestant.judge_command:
+            errors.append(f"{contestant.contestant_id}: enabled challenger lacks judge_command")
     return errors
 
 
@@ -69,6 +71,19 @@ def cmd_plan(args: argparse.Namespace) -> int:
 def cmd_run(args: argparse.Namespace) -> int:
     _, lab = load_lab(args)
     results = lab.run_all(splits=tuple(args.splits.split(",")))
+    print(json.dumps([result.to_dict() for result in results], indent=2))
+    return 0
+
+
+def cmd_judge(args: argparse.Namespace) -> int:
+    _, lab = load_lab(args)
+    private = Path(args.private_registry)
+    if args.plan_only:
+        runs = lab.plan_blind(private_registry=private)
+        print(lab.describe_plan(runs))
+        print(f"planned_blind_runs={len(runs)}")
+        return 0 if runs else 2
+    results = lab.run_blind(private_registry=private)
     print(json.dumps([result.to_dict() for result in results], indent=2))
     return 0
 
@@ -128,6 +143,17 @@ def cmd_promote(args: argparse.Namespace) -> int:
     output.write_text(json.dumps(payload, indent=2) + "\n")
     print(json.dumps(payload, indent=2))
     return 0 if promoted else 2
+
+
+def cmd_kaggle_ready(args: argparse.Namespace) -> int:
+    _, lab = load_lab(args)
+    queue = lab.kaggle_ready_queue()
+    payload = {"experiment_id": lab.manifest.experiment_id, "kaggle_ready": queue}
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, indent=2) + "\n")
+    print(json.dumps(payload, indent=2))
+    return 0 if queue else 2
 
 
 def cmd_leaderboard(args: argparse.Namespace) -> int:
@@ -191,6 +217,13 @@ def parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run")
     run.add_argument("--splits", default="dev,validation")
 
+    judge = sub.add_parser("judge")
+    judge.add_argument(
+        "--private-registry",
+        default="artifacts/arena/v013/splits.private.json",
+    )
+    judge.add_argument("--plan-only", action="store_true")
+
     ingest_suite = sub.add_parser("ingest-suite")
     ingest_suite.add_argument("--suite", required=True)
     ingest_suite.add_argument("--contestant", required=True)
@@ -218,6 +251,9 @@ def parser() -> argparse.ArgumentParser:
 
     promote = sub.add_parser("promote")
     promote.add_argument("--output", default="artifacts/arena/v013/promotion.json")
+
+    ready = sub.add_parser("kaggle-ready")
+    ready.add_argument("--output", default="artifacts/arena/v013/kaggle-ready.json")
 
     leaderboard = sub.add_parser("leaderboard")
     leaderboard.add_argument(
@@ -251,6 +287,8 @@ def main() -> int:
         return cmd_plan(args)
     if args.command == "run":
         return cmd_run(args)
+    if args.command == "judge":
+        return cmd_judge(args)
     if args.command == "ingest-suite":
         return cmd_ingest_suite(args)
     if args.command == "ingest-result":
@@ -261,6 +299,8 @@ def main() -> int:
         return cmd_score(args)
     if args.command == "promote":
         return cmd_promote(args)
+    if args.command == "kaggle-ready":
+        return cmd_kaggle_ready(args)
     if args.command == "leaderboard":
         return cmd_leaderboard(args)
     if args.command == "split":
