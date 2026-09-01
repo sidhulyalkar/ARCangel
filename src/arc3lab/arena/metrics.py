@@ -80,12 +80,16 @@ def suite_payload_to_result(
         "timeout_fraction": timeout_fraction,
         "emergency_fraction": emergency_fraction,
     }
+    # A structurally valid suite remains scoreable when one game fails. The explicit
+    # failure/timeout metrics carry the penalty and preserve information about the rest
+    # of the run. Reserve non-ok status for runner-level failures that produced no
+    # trustworthy suite receipt.
     return ArenaResult(
         contestant_id=contestant_id,
         split=split,
         seed=seed,
         metrics=metrics,
-        status="ok" if failures == 0 else "degraded",
+        status="ok",
         source=source,
         metadata={
             "games": len(real_games),
@@ -95,6 +99,7 @@ def suite_payload_to_result(
             "model_calls": model_calls,
             "expectation_checks": expectation_checks,
             "hypothesis_tests": hypothesis_tests,
+            "failed_games": failures,
             "elapsed_seconds": float(payload.get("elapsed_seconds", 0.0)),
         },
     )
