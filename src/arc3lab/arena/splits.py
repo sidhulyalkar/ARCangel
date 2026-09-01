@@ -30,22 +30,28 @@ class SplitRegistry:
         if dev_fraction + validation_fraction >= 1:
             raise ValueError("dev + validation fractions must leave a blind split")
         unique = sorted({str(game_id) for game_id in game_ids})
-        buckets: dict[str, list[str]] = {"dev": [], "validation": [], "blind": []}
-        for game_id in unique:
-            digest = hashlib.sha256(f"{salt}:{game_id}".encode()).digest()
-            unit = int.from_bytes(digest[:8], "big") / float(2**64)
-            if unit < dev_fraction:
-                buckets["dev"].append(game_id)
-            elif unit < dev_fraction + validation_fraction:
-                buckets["validation"].append(game_id)
-            else:
-                buckets["blind"].append(game_id)
-        return cls(
-            dev=tuple(buckets["dev"]),
-            validation=tuple(buckets["validation"]),
-            blind=tuple(buckets["blind"]),
-            salt=salt,
+        if len(unique) < 3:
+            raise ValueError("at least three unique games are required")
+
+        ranked = sorted(
+            unique,
+            key=lambda game_id: hashlib.sha256(f"{salt}:{game_id}".encode()).digest(),
         )
+        n = len(ranked)
+        dev_count = max(1, int(round(n * dev_fraction)))
+        validation_count = max(1, int(round(n * validation_fraction)))
+        if dev_count + validation_count >= n:
+            dev_count = max(1, n - validation_count - 1)
+        if dev_count + validation_count >= n:
+            validation_count = max(1, n - dev_count - 1)
+        blind_count = n - dev_count - validation_count
+        if blind_count < 1:
+            raise AssertionError("split allocation failed to reserve a blind game")
+
+        dev = tuple(sorted(ranked[:dev_count]))
+        validation = tuple(sorted(ranked[dev_count : dev_count + validation_count]))
+        blind = tuple(sorted(ranked[dev_count + validation_count :]))
+        return cls(dev=dev, validation=validation, blind=blind, salt=salt)
 
     def ids(self, split: str) -> tuple[str, ...]:
         if split not in {"dev", "validation", "blind"}:
