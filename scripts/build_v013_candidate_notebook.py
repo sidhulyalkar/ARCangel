@@ -32,11 +32,17 @@ def _add_file(tf: tarfile.TarFile, path: Path, arcname: str) -> None:
 
 
 def bundle_source() -> tuple[str, str]:
+    """Bundle only authoritative source, never interpreter caches or local artifacts."""
     buf = io.BytesIO()
     with gzip.GzipFile(fileobj=buf, mode="wb", mtime=0, filename="") as gz:
         with tarfile.open(fileobj=gz, mode="w") as tf:
             src = ROOT / "src" / "arc3lab"
-            for path in sorted(p for p in src.rglob("*") if p.is_file()):
+            paths = sorted(
+                path
+                for path in src.rglob("*.py")
+                if path.is_file() and "__pycache__" not in path.parts
+            )
+            for path in paths:
                 _add_file(tf, path, path.relative_to(ROOT).as_posix())
             runner = ROOT / "scripts" / "run_v013_candidate.py"
             _add_file(tf, runner, "scripts/run_v013_candidate.py")
