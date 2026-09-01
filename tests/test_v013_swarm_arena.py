@@ -6,6 +6,7 @@ from pathlib import Path
 
 from arc3lab.arena.metrics import suite_payload_to_result
 from arc3lab.arena.orchestrator import ArenaOrchestrator
+from arc3lab.arena.research_agents import ProviderSpec, ResearchProposal, ResearchSwarm
 from arc3lab.arena.research_packet import ResearchPacketBuilder
 from arc3lab.arena.schema import ArenaManifest, ArenaResult
 from arc3lab.arena.scoring import aggregate_results, promotion_decision
@@ -38,7 +39,14 @@ def manifest_file(tmp_path: Path) -> Path:
                         "family": "v012",
                         "role": "scientist",
                         "control_id": "control",
-                        "command": ["python", "fake.py", "{contestant}", "{split}", "{seed}", "{result}"],
+                        "command": [
+                            "python",
+                            "fake.py",
+                            "{contestant}",
+                            "{split}",
+                            "{seed}",
+                            "{result}",
+                        ],
                     },
                 ],
             }
@@ -47,12 +55,27 @@ def manifest_file(tmp_path: Path) -> Path:
     return path
 
 
-def result(cid: str, split: str, seed: int, score: float, emergency: float = 0.0) -> ArenaResult:
+def result(
+    cid: str,
+    split: str,
+    seed: int,
+    score: float,
+    emergency: float = 0.0,
+) -> ArenaResult:
     return ArenaResult(
         contestant_id=cid,
         split=split,
         seed=seed,
         metrics={"solve_rate": score, "emergency_fraction": emergency},
+    )
+
+
+def kaggle_result(cid: str, seed: int, score: float) -> ArenaResult:
+    return ArenaResult(
+        contestant_id=cid,
+        split="kaggle",
+        seed=seed,
+        metrics={"official_score": score},
     )
 
 
@@ -92,7 +115,7 @@ def test_emergency_ownership_blocks_promotion(tmp_path: Path) -> None:
     assert any("emergency" in reason for reason in decision.reasons)
 
 
-def test_leaderboard_nomination_requires_duck_kaggle_control(tmp_path: Path) -> None:
+def test_leaderboard_nomination_requires_actual_duck_kaggle_control(tmp_path: Path) -> None:
     manifest = ArenaManifest.load(manifest_file(tmp_path))
     lab = ArenaOrchestrator(manifest, tmp_path / "arena")
     lab.ledger.extend(
@@ -105,14 +128,31 @@ def test_leaderboard_nomination_requires_duck_kaggle_control(tmp_path: Path) -> 
             result("challenger", "dev", 2, 0.50),
             result("challenger", "validation", 1, 0.50),
             result("challenger", "validation", 2, 0.50),
-            result("challenger", "kaggle", 1, 0.60),
+            kaggle_result("challenger", 1, 2.30),
         ]
     )
     assert lab.promotion_queue() == ["challenger"]
     assert lab.leaderboard_queue() == []
-    lab.ledger.append(result("duck", "kaggle", 1, 0.55))
+    lab.ledger.append(kaggle_result("duck", 1, 2.23))
     queue = lab.leaderboard_queue()
     assert queue and queue[0]["contestant_id"] == "challenger"
+    assert abs(float(queue[0]["kaggle_delta"]) - 0.07) < 1e-9
+
+
+def test_record_kaggle_score_preserves_artifact_provenance(tmp_path: Path) -> None:
+    manifest = ArenaManifest.load(manifest_file(tmp_path))
+    lab = ArenaOrchestrator(manifest, tmp_path / "arena")
+    row = lab.record_kaggle_score(
+        contestant_id="duck",
+        score=2.23,
+        seed=9,
+        source="copy-edit-run",
+        artifact_sha256="abc123",
+        runtime_seconds=8000,
+    )
+    assert row.metrics["official_score"] == 2.23
+    assert row.metadata["artifact_sha256"] == "abc123"
+    assert row.metadata["runtime_seconds"] == 8000.0
 
 
 def test_split_registry_is_deterministic_and_hides_blind_ids() -> None:
@@ -145,8 +185,50 @@ def test_research_packet_is_deterministic_and_excludes_blind(tmp_path: Path) -> 
         names = archive.getnames()
         assert "repo/visible.md" in names
         assert all("blind-results" not in name for name in names)
-        scorecard = json.loads(archive.extractfile("arena/scorecard.json").read())
+        handle = archive.extractfile("arena/scorecard.json")
+        assert handle is not None
+        scorecard = json.loads(handle.read())
         assert "blind" not in scorecard["rankings"]
+
+
+def test_research_proposal_requires_explicit_falsifier_contract() -> None:
+    good = ResearchProposal.from_text(
+        "p",
+        "scientist",
+        json.dumps(
+            {
+                "hypothesis": "exact history helps",
+                "experiment": "ablate retrieval",
+                "target_metric": "solve_rate",
+                "split": "validation",
+                "falsifier": "no improvement",
+                "implementation": "add selective retrieval",
+                "failure_mode": "context overload",
+            }
+        ),
+    )
+    bad = ResearchProposal.from_text("p", "scientist", '{"hypothesis":"sounds nice"}')
+    assert good.valid
+    assert not bad.valid
+
+
+def test_research_swarm_plans_provider_role_cross_product() -> None:
+    swarm = ResearchSwarm(
+        [
+            ProviderSpec(
+                provider_id="model-a",
+                base_url="https://example.invalid/v1",
+                model="a",
+                api_key_env="NO_KEY",
+                roles=("scientist", "red_team"),
+            )
+        ]
+    )
+    calls = swarm.plan()
+    assert [(call.provider_id, call.role_id) for call in calls] == [
+        ("model-a", "scientist"),
+        ("model-a", "red_team"),
+    ]
 
 
 def test_suite_metrics_capture_efficiency_and_scientific_health() -> None:
