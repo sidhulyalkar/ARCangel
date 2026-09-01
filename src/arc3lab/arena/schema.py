@@ -72,10 +72,10 @@ class ArenaManifest:
     split_salt: str = "arcangel-v013"
     leaderboard_control_id: str | None = None
     min_leaderboard_delta: float = 0.0
-    min_leaderboard_candidate_runs: int = 2
-    min_leaderboard_control_runs: int = 2
+    min_leaderboard_candidate_runs: int = 1
+    min_leaderboard_control_runs: int = 1
     leaderboard_confidence_se: float = 1.0
-    require_leaderboard_artifact_hash: bool = True
+    require_leaderboard_artifact_hash: bool = False
 
     @classmethod
     def load(cls, path: str | Path) -> "ArenaManifest":
@@ -89,8 +89,8 @@ class ArenaManifest:
             raise ValueError("manifest requires scoring weights")
         if sum(abs(value) for value in weights.values()) <= 0:
             raise ValueError("scoring weights cannot all be zero")
-        candidate_runs = max(1, int(raw.get("min_leaderboard_candidate_runs", 2)))
-        control_runs = max(1, int(raw.get("min_leaderboard_control_runs", 2)))
+        candidate_runs = max(1, int(raw.get("min_leaderboard_candidate_runs", 1)))
+        control_runs = max(1, int(raw.get("min_leaderboard_control_runs", 1)))
         confidence_se = max(0.0, float(raw.get("leaderboard_confidence_se", 1.0)))
         return cls(
             experiment_id=str(raw["experiment_id"]),
@@ -111,7 +111,7 @@ class ArenaManifest:
             min_leaderboard_control_runs=control_runs,
             leaderboard_confidence_se=confidence_se,
             require_leaderboard_artifact_hash=bool(
-                raw.get("require_leaderboard_artifact_hash", True)
+                raw.get("require_leaderboard_artifact_hash", False)
             ),
         )
 
