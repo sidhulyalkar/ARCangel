@@ -238,6 +238,8 @@ class SwarmCouncil:
             "falsifier": str(proposal.falsifier),
             "implementation": str(proposal.implementation),
             "failure_mode": str(proposal.failure_mode),
+            "target_profile": str(getattr(proposal, "target_profile", "")),
+            "control_profile": str(getattr(proposal, "control_profile", "")),
         }
 
     def eligible_proposals(self) -> list[Any]:
@@ -246,6 +248,7 @@ class SwarmCouncil:
             for proposal in self.proposals
             if bool(getattr(proposal, "valid", False))
             and str(getattr(proposal, "split", "")).lower() in {"dev", "validation"}
+            and bool(getattr(proposal, "executable_contract_valid", False))
         ]
 
     def assign_reviews(
@@ -440,6 +443,8 @@ class SwarmCouncil:
                     "falsifier": proposal.falsifier,
                     "implementation": proposal.implementation,
                     "failure_mode": proposal.failure_mode,
+                    "target_profile": proposal.target_profile,
+                    "control_profile": proposal.control_profile,
                     "review": priority.to_dict(),
                     "disagreement_experiment": priority.dissent_experiment,
                     "suggested_branch": f"experiment/swarm-{index:02d}-{particle}",
