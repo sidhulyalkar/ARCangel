@@ -36,8 +36,8 @@ class ProposalTournament:
                     falsifier=str(data.get("falsifier", "")),
                     implementation=str(data.get("implementation", "")),
                     failure_mode=str(data.get("failure_mode", "")),
-                    target_profile=str(data.get("target_profile", "v012")),
-                    control_profile=str(data.get("control_profile", "coding-minimal")),
+                    target_profile=str(data.get("target_profile", "")),
+                    control_profile=str(data.get("control_profile", "")),
                     raw_text=str(data.get("raw_text", "")),
                     valid=bool(data.get("valid", False)),
                 )
