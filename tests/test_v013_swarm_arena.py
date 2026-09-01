@@ -4,6 +4,8 @@ import json
 import tarfile
 from pathlib import Path
 
+import pytest
+
 from arc3lab.arena.evolution import ProposalTournament
 from arc3lab.arena.metrics import suite_payload_to_result
 from arc3lab.arena.orchestrator import ArenaOrchestrator
@@ -27,14 +29,30 @@ def manifest_file(tmp_path: Path) -> Path:
                 "promotion": {
                     "min_validation_delta": 0.05,
                     "min_dev_delta": -0.01,
+                    "min_blind_delta": -0.01,
                     "min_validation_runs": 2,
+                    "min_blind_runs": 2,
                     "max_emergency_fraction": 0.02,
                     "max_failure_rate": 0.05,
                     "require_control": True,
                 },
                 "contestants": [
                     {"id": "duck", "family": "duck", "role": "external", "enabled": False},
-                    {"id": "control", "family": "coding", "role": "control", "enabled": False},
+                    {
+                        "id": "control",
+                        "family": "coding",
+                        "role": "control",
+                        "enabled": False,
+                        "judge_command": [
+                            "python",
+                            "fake.py",
+                            "{contestant}",
+                            "blind",
+                            "{seed}",
+                            "{result}",
+                            "{private_registry}",
+                        ],
+                    },
                     {
                         "id": "challenger",
                         "family": "v012",
@@ -47,6 +65,15 @@ def manifest_file(tmp_path: Path) -> Path:
                             "{split}",
                             "{seed}",
                             "{result}",
+                        ],
+                        "judge_command": [
+                            "python",
+                            "fake.py",
+                            "{contestant}",
+                            "blind",
+                            "{seed}",
+                            "{result}",
+                            "{private_registry}",
                         ],
                     },
                 ],
@@ -101,6 +128,28 @@ def proposal(
     )
 
 
+def internal_winner_rows() -> list[ArenaResult]:
+    return [
+        result("control", "dev", 1, 0.30),
+        result("control", "dev", 2, 0.30),
+        result("control", "validation", 1, 0.30),
+        result("control", "validation", 2, 0.30),
+        result("challenger", "dev", 1, 0.50),
+        result("challenger", "dev", 2, 0.50),
+        result("challenger", "validation", 1, 0.50),
+        result("challenger", "validation", 2, 0.50),
+    ]
+
+
+def blind_pass_rows() -> list[ArenaResult]:
+    return [
+        result("control", "blind", 1, 0.40),
+        result("control", "blind", 2, 0.40),
+        result("challenger", "blind", 1, 0.46),
+        result("challenger", "blind", 2, 0.45),
+    ]
+
+
 def test_promotion_requires_repeatable_validation_control_delta(tmp_path: Path) -> None:
     manifest = ArenaManifest.load(manifest_file(tmp_path))
     rows = [
@@ -137,23 +186,55 @@ def test_emergency_ownership_blocks_promotion(tmp_path: Path) -> None:
     assert any("emergency" in reason for reason in decision.reasons)
 
 
+def test_normal_research_plan_cannot_request_blind(tmp_path: Path) -> None:
+    lab = ArenaOrchestrator(ArenaManifest.load(manifest_file(tmp_path)), tmp_path / "arena")
+    with pytest.raises(ValueError, match="judge-owned"):
+        lab.plan(splits=["blind"])
+
+
+def test_blind_plan_runs_only_promoted_candidate_and_control(tmp_path: Path) -> None:
+    manifest = ArenaManifest.load(manifest_file(tmp_path))
+    lab = ArenaOrchestrator(manifest, tmp_path / "arena")
+    lab.ledger.extend(internal_winner_rows())
+    private = tmp_path / "splits.private.json"
+    private.write_text('{"blind":["secret-game"]}')
+    runs = lab.plan_blind(private_registry=private)
+    assert len(runs) == 4
+    assert {run.contestant_id for run in runs} == {"control", "challenger"}
+    assert all(run.split == "blind" for run in runs)
+    assert all(str(private) in run.command for run in runs)
+
+
+def test_kaggle_ready_requires_private_blind_pass(tmp_path: Path) -> None:
+    manifest = ArenaManifest.load(manifest_file(tmp_path))
+    lab = ArenaOrchestrator(manifest, tmp_path / "arena")
+    lab.ledger.extend(internal_winner_rows())
+    assert lab.promotion_queue() == ["challenger"]
+    assert lab.kaggle_ready_queue() == []
+    lab.ledger.extend(blind_pass_rows())
+    ready = lab.kaggle_ready_queue()
+    assert ready and ready[0]["contestant_id"] == "challenger"
+
+
+def test_record_candidate_kaggle_score_refuses_to_bypass_blind(tmp_path: Path) -> None:
+    manifest = ArenaManifest.load(manifest_file(tmp_path))
+    lab = ArenaOrchestrator(manifest, tmp_path / "arena")
+    lab.ledger.extend(internal_winner_rows())
+    with pytest.raises(ValueError, match="private BLIND"):
+        lab.record_kaggle_score(
+            contestant_id="challenger",
+            score=2.30,
+            seed=1,
+            source="forbidden-early-submit",
+        )
+
+
 def test_leaderboard_nomination_requires_actual_duck_kaggle_control(tmp_path: Path) -> None:
     manifest = ArenaManifest.load(manifest_file(tmp_path))
     lab = ArenaOrchestrator(manifest, tmp_path / "arena")
-    lab.ledger.extend(
-        [
-            result("control", "dev", 1, 0.30),
-            result("control", "dev", 2, 0.30),
-            result("control", "validation", 1, 0.30),
-            result("control", "validation", 2, 0.30),
-            result("challenger", "dev", 1, 0.50),
-            result("challenger", "dev", 2, 0.50),
-            result("challenger", "validation", 1, 0.50),
-            result("challenger", "validation", 2, 0.50),
-            kaggle_result("challenger", 1, 2.30),
-        ]
-    )
-    assert lab.promotion_queue() == ["challenger"]
+    lab.ledger.extend(internal_winner_rows() + blind_pass_rows())
+    lab.ledger.append(kaggle_result("challenger", 1, 2.30))
+    assert lab.kaggle_ready_queue()
     assert lab.leaderboard_queue() == []
     lab.ledger.append(kaggle_result("duck", 1, 2.23))
     queue = lab.leaderboard_queue()
