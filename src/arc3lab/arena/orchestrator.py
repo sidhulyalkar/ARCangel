@@ -9,6 +9,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Iterable
 
+from arc3lab.arena.leaderboard import artifact_evidence, compare_artifacts
 from arc3lab.arena.ledger import ResultLedger
 from arc3lab.arena.schema import ArenaManifest, ArenaResult, ContestantSpec, PlannedRun
 from arc3lab.arena.scoring import aggregate_results, promotion_decision, rank_split
@@ -69,7 +70,9 @@ class ArenaOrchestrator:
         for split in splits:
             if split == "blind":
                 raise ValueError("BLIND is judge-owned; use plan_blind() with the private registry")
-            if split not in {"dev", "validation", "kaggle"}:
+            if split == "kaggle":
+                raise ValueError("Kaggle evidence is external; use record_kaggle_score()")
+            if split not in {"dev", "validation"}:
                 raise ValueError(f"unsupported split: {split}")
         for contestant in self.manifest.contestants:
             if not contestant.enabled or not contestant.command:
@@ -217,6 +220,13 @@ class ArenaOrchestrator:
         runtime_seconds: float | None = None,
     ) -> ArenaResult:
         self._contestant(contestant_id)
+        artifact_sha256 = artifact_sha256.strip().lower()
+        if self.manifest.require_leaderboard_artifact_hash and not artifact_sha256:
+            raise ValueError("Kaggle score receipts require the exact notebook artifact SHA-256")
+        if not source.strip():
+            raise ValueError("Kaggle score receipts require an external source/provenance label")
+        if (contestant_id, "kaggle", seed) in self.ledger.run_keys():
+            raise ValueError(f"duplicate Kaggle run key for {contestant_id} seed={seed}")
         if contestant_id != self.manifest.leaderboard_control_id:
             ready = {row["contestant_id"] for row in self.kaggle_ready_queue()}
             if contestant_id not in ready:
@@ -284,36 +294,82 @@ class ArenaOrchestrator:
             )
         return sorted(queue, key=lambda item: float(item["blind_delta"]), reverse=True)
 
+    def leaderboard_evidence(self) -> dict[str, object]:
+        results = self.ledger.read()
+        control_id = self.manifest.leaderboard_control_id
+        control_rows = (
+            artifact_evidence(
+                results,
+                control_id,
+                confidence_se=self.manifest.leaderboard_confidence_se,
+                require_hash=self.manifest.require_leaderboard_artifact_hash,
+            )
+            if control_id
+            else []
+        )
+        ready = {row["contestant_id"] for row in self.kaggle_ready_queue()}
+        candidate_rows = {
+            contestant_id: [row.to_dict() for row in artifact_evidence(
+                results,
+                contestant_id,
+                confidence_se=self.manifest.leaderboard_confidence_se,
+                require_hash=self.manifest.require_leaderboard_artifact_hash,
+            )]
+            for contestant_id in sorted(ready)
+        }
+        return {
+            "control_id": control_id,
+            "required_control_runs": self.manifest.min_leaderboard_control_runs,
+            "required_candidate_runs": self.manifest.min_leaderboard_candidate_runs,
+            "confidence_se": self.manifest.leaderboard_confidence_se,
+            "control_artifacts": [row.to_dict() for row in control_rows],
+            "candidate_artifacts": candidate_rows,
+        }
+
     def leaderboard_queue(self) -> list[dict[str, object]]:
-        """Nominate only blind-qualified contestants that beat the public Kaggle control."""
-        aggregates = aggregate_results(self.ledger.read(), self.manifest)
+        """Use repeated exact-artifact Kaggle evidence, not a single noisy public score."""
+        results = self.ledger.read()
         control_id = self.manifest.leaderboard_control_id
         if not control_id:
             return []
-        control = aggregates.get((control_id, "kaggle"))
-        if control is None or "official_score" not in control.metrics:
+        control_groups = artifact_evidence(
+            results,
+            control_id,
+            confidence_se=self.manifest.leaderboard_confidence_se,
+            require_hash=self.manifest.require_leaderboard_artifact_hash,
+        )
+        qualified_controls = [
+            row for row in control_groups if row.runs >= self.manifest.min_leaderboard_control_runs
+        ]
+        # Multiple qualified control hashes make the baseline ambiguous. Give each exact
+        # control notebook its own contestant ID rather than cherry-picking a control run.
+        if len(qualified_controls) != 1:
             return []
-        control_score = float(control.metrics["official_score"])
+        control = qualified_controls[0]
         ready = {row["contestant_id"] for row in self.kaggle_ready_queue()}
         queue: list[dict[str, object]] = []
         for contestant_id in sorted(ready):
-            row = aggregates.get((contestant_id, "kaggle"))
-            if row is None or "official_score" not in row.metrics:
-                continue
-            contestant_score = float(row.metrics["official_score"])
-            delta = contestant_score - control_score
-            if delta < self.manifest.min_leaderboard_delta:
-                continue
-            queue.append(
-                {
-                    "contestant_id": contestant_id,
-                    "control_id": control_id,
-                    "kaggle_delta": delta,
-                    "contestant_score": contestant_score,
-                    "control_score": control_score,
-                }
-            )
-        return sorted(queue, key=lambda item: float(item["kaggle_delta"]), reverse=True)
+            for candidate in artifact_evidence(
+                results,
+                contestant_id,
+                confidence_se=self.manifest.leaderboard_confidence_se,
+                require_hash=self.manifest.require_leaderboard_artifact_hash,
+            ):
+                comparison = compare_artifacts(
+                    candidate,
+                    control,
+                    min_candidate_runs=self.manifest.min_leaderboard_candidate_runs,
+                    min_control_runs=self.manifest.min_leaderboard_control_runs,
+                    min_delta=self.manifest.min_leaderboard_delta,
+                    confidence_se=self.manifest.leaderboard_confidence_se,
+                )
+                if comparison.ready:
+                    queue.append(comparison.to_dict())
+        return sorted(
+            queue,
+            key=lambda item: (float(item["delta_lower_bound"]), float(item["mean_delta"])),
+            reverse=True,
+        )
 
     def scorecard(self, *, include_blind: bool = False) -> dict[str, object]:
         results = self.ledger.read()
@@ -322,7 +378,7 @@ class ArenaOrchestrator:
         aggregates = aggregate_results(results, self.manifest)
         split_rankings = {
             split: [asdict(item) for item in rank_split(aggregates, split)]
-            for split in ("dev", "validation", "kaggle")
+            for split in ("dev", "validation")
             if any(row.split == split for row in results)
         }
         if include_blind and any(row.split == "blind" for row in results):
@@ -339,6 +395,7 @@ class ArenaOrchestrator:
             "rankings": split_rankings,
             "promotion_decisions": decisions,
             "leaderboard_control_id": self.manifest.leaderboard_control_id,
+            "leaderboard_evidence": self.leaderboard_evidence(),
             "leaderboard_queue": self.leaderboard_queue(),
         }
 
