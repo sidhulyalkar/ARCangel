@@ -10,6 +10,7 @@ from arc3lab.arena.research_agents import (
     ResearchSwarm,
 )
 from arc3lab.arena.research_packet import DEFAULT_ROLES, ResearchPacketBuilder, ResearchRole
+from arc3lab.arena.runtime_budget import RuntimeBudgetAudit, audit_runtime_budget
 from arc3lab.arena.schema import ArenaManifest, ArenaResult, ContestantSpec, PlannedRun
 from arc3lab.arena.scoring import AggregateScore, PromotionDecision
 from arc3lab.arena.splits import SplitRegistry
@@ -33,6 +34,8 @@ __all__ = [
     "ResearchRole",
     "ResearchSwarm",
     "ResultLedger",
+    "RuntimeBudgetAudit",
     "SplitRegistry",
+    "audit_runtime_budget",
     "suite_payload_to_result",
 ]
