@@ -7,6 +7,7 @@ from pathlib import Path
 from arc3lab.arena.evolution import ProposalTournament
 from arc3lab.arena.orchestrator import ArenaOrchestrator
 from arc3lab.arena.research_agents import ResearchSwarm
+from arc3lab.arena.research_context import build_research_scorecard
 from arc3lab.arena.schema import ArenaManifest
 from arc3lab.arena.swarm_intelligence import ResearchReview, SwarmCouncil
 
@@ -18,7 +19,7 @@ def build_context(
     *,
     max_chars: int,
 ) -> str:
-    sections = ["# CURRENT ARENA SCORECARD\n" + json.dumps(scorecard, indent=2)]
+    sections = ["# DEV/VALIDATION RESEARCH SCORECARD\n" + json.dumps(scorecard, indent=2)]
     used = len(sections[0])
     for line in include_list.read_text().splitlines():
         rel = line.strip()
@@ -99,10 +100,11 @@ def main() -> int:
         return 0
 
     lab = ArenaOrchestrator(manifest, args.arena_root)
+    scorecard = build_research_scorecard(lab)
     context = build_context(
         Path(args.repo_root),
         Path(args.include_list),
-        lab.scorecard(include_blind=False),
+        scorecard,
         max_chars=args.max_context_chars,
     )
     review_dir = Path(args.reviews)
@@ -130,6 +132,7 @@ def main() -> int:
                 "reviews": len(reviews),
                 "valid_reviews": sum(review.valid for review in reviews),
                 "selected": battle["selected_count"],
+                "research_evidence_scope": scorecard["evidence_scope"],
                 "battle_plan": str(battle_path),
                 "authority": battle["authority"],
             },
