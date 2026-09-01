@@ -1,3 +1,4 @@
+from arc3lab.arena.evolution import ProposalTournament
 from arc3lab.arena.ledger import ResultLedger
 from arc3lab.arena.metrics import suite_payload_to_result
 from arc3lab.arena.orchestrator import ArenaOrchestrator
@@ -21,6 +22,7 @@ __all__ = [
     "DEFAULT_ROLES",
     "PlannedRun",
     "PromotionDecision",
+    "ProposalTournament",
     "ProviderSpec",
     "ResearchCall",
     "ResearchPacketBuilder",
