@@ -9,10 +9,12 @@ on:
       - 'scripts/run_research_swarm.py'
       - 'scripts/init_swarm_splits.py'
       - 'scripts/plan_research_round.py'
+      - 'scripts/run_experiment_workers.py'
       - 'configs/swarm-v013.json'
       - 'configs/swarm-packet-files.txt'
       - 'configs/research-providers.example.json'
-      - 'tests/test_v013_swarm_arena.py'
+      - 'configs/experiment-workers.example.json'
+      - 'tests/test_v013_*.py'
       - '.github/workflows/swarm-ci.yml'
   pull_request:
     paths:
@@ -22,10 +24,12 @@ on:
       - 'scripts/run_research_swarm.py'
       - 'scripts/init_swarm_splits.py'
       - 'scripts/plan_research_round.py'
+      - 'scripts/run_experiment_workers.py'
       - 'configs/swarm-v013.json'
       - 'configs/swarm-packet-files.txt'
       - 'configs/research-providers.example.json'
-      - 'tests/test_v013_swarm_arena.py'
+      - 'configs/experiment-workers.example.json'
+      - 'tests/test_v013_*.py'
       - '.github/workflows/swarm-ci.yml'
 
 jobs:
@@ -43,7 +47,7 @@ jobs:
       - run: python -m pip install -e '.[dev]'
       - run: python scripts/run_swarm_lab.py validate
       - run: python scripts/run_research_swarm.py --providers configs/research-providers.example.json --plan-only
-      - run: python -m pytest -q tests/test_v013_swarm_arena.py
+      - run: python -m pytest -q tests/test_v013_swarm_arena.py tests/test_v013_workers.py
       - run: >-
           python -m ruff check
           src/arc3lab/arena
@@ -52,7 +56,9 @@ jobs:
           scripts/run_research_swarm.py
           scripts/init_swarm_splits.py
           scripts/plan_research_round.py
+          scripts/run_experiment_workers.py
           tests/test_v013_swarm_arena.py
+          tests/test_v013_workers.py
       - run: >-
           python -m compileall -q
           src/arc3lab/arena
@@ -61,3 +67,4 @@ jobs:
           scripts/run_research_swarm.py
           scripts/init_swarm_splits.py
           scripts/plan_research_round.py
+          scripts/run_experiment_workers.py
