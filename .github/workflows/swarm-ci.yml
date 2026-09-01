@@ -7,6 +7,7 @@ on:
       - 'src/arc3lab/evaluation/runner.py'
       - 'scripts/run_swarm_lab.py'
       - 'scripts/run_arena_contestant.py'
+      - 'scripts/run_first_tournament.py'
       - 'scripts/run_research_swarm.py'
       - 'scripts/init_swarm_splits.py'
       - 'scripts/plan_research_round.py'
@@ -27,6 +28,7 @@ on:
       - 'src/arc3lab/evaluation/runner.py'
       - 'scripts/run_swarm_lab.py'
       - 'scripts/run_arena_contestant.py'
+      - 'scripts/run_first_tournament.py'
       - 'scripts/run_research_swarm.py'
       - 'scripts/init_swarm_splits.py'
       - 'scripts/plan_research_round.py'
@@ -64,6 +66,7 @@ jobs:
           src/arc3lab/evaluation/runner.py
           scripts/run_swarm_lab.py
           scripts/run_arena_contestant.py
+          scripts/run_first_tournament.py
           scripts/run_research_swarm.py
           scripts/init_swarm_splits.py
           scripts/plan_research_round.py
@@ -79,6 +82,7 @@ jobs:
           src/arc3lab/evaluation/runner.py
           scripts/run_swarm_lab.py
           scripts/run_arena_contestant.py
+          scripts/run_first_tournament.py
           scripts/run_research_swarm.py
           scripts/init_swarm_splits.py
           scripts/plan_research_round.py
