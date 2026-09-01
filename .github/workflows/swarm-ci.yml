@@ -6,8 +6,10 @@ on:
       - 'src/arc3lab/arena/**'
       - 'scripts/run_swarm_lab.py'
       - 'scripts/run_arena_contestant.py'
+      - 'scripts/run_research_swarm.py'
       - 'configs/swarm-v013.json'
       - 'configs/swarm-packet-files.txt'
+      - 'configs/research-providers.example.json'
       - 'tests/test_v013_swarm_arena.py'
       - '.github/workflows/swarm-ci.yml'
   pull_request:
@@ -15,8 +17,10 @@ on:
       - 'src/arc3lab/arena/**'
       - 'scripts/run_swarm_lab.py'
       - 'scripts/run_arena_contestant.py'
+      - 'scripts/run_research_swarm.py'
       - 'configs/swarm-v013.json'
       - 'configs/swarm-packet-files.txt'
+      - 'configs/research-providers.example.json'
       - 'tests/test_v013_swarm_arena.py'
       - '.github/workflows/swarm-ci.yml'
 
@@ -34,11 +38,18 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install -e '.[dev]'
       - run: python scripts/run_swarm_lab.py validate
+      - run: python scripts/run_research_swarm.py --providers configs/research-providers.example.json --plan-only
       - run: python -m pytest -q tests/test_v013_swarm_arena.py
       - run: >-
           python -m ruff check
           src/arc3lab/arena
           scripts/run_swarm_lab.py
           scripts/run_arena_contestant.py
+          scripts/run_research_swarm.py
           tests/test_v013_swarm_arena.py
-      - run: python -m compileall -q src/arc3lab/arena scripts/run_swarm_lab.py scripts/run_arena_contestant.py
+      - run: >-
+          python -m compileall -q
+          src/arc3lab/arena
+          scripts/run_swarm_lab.py
+          scripts/run_arena_contestant.py
+          scripts/run_research_swarm.py
