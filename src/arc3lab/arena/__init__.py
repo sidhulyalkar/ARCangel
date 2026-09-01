@@ -1,3 +1,4 @@
+from arc3lab.arena.campaign import CampaignDecision, CampaignDirector
 from arc3lab.arena.evolution import ProposalTournament
 from arc3lab.arena.first_tournament import FirstTournamentDirector, TournamentStage
 from arc3lab.arena.leaderboard import ArtifactEvidence, LeaderboardComparison
@@ -22,6 +23,8 @@ __all__ = [
     "ArenaOrchestrator",
     "ArenaResult",
     "ArtifactEvidence",
+    "CampaignDecision",
+    "CampaignDirector",
     "ContestantSpec",
     "DEFAULT_ROLES",
     "FirstTournamentDirector",
