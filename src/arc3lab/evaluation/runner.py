@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from math import ceil
 from pathlib import Path
 from typing import Any, Callable
 
@@ -234,10 +235,17 @@ def run_suite(
     output_path: str | Path | None = None,
     time_budget_seconds: float | None = None,
     game_time_budget_seconds: float | None = None,
+    coverage_reserve_fraction: float | None = None,
 ) -> dict[str, Any]:
-    """Run a scorecard with fail-soft per-game execution and a shared deadline."""
+    """Run a scorecard with fail-soft per-game execution and a shared deadline.
+
+    When ``coverage_reserve_fraction`` is provided, the per-game cap is tightened only
+    when necessary to keep all discovered games schedulable within the shared deadline.
+    This prevents slow early games from starving later hidden games in a fixed worker pool.
+    """
     from arc_agi import Arcade
 
+    workers = max(1, int(workers))
     arc = Arcade()
     available = [x.game_id for x in arc.get_environments()]
     if games:
@@ -255,6 +263,37 @@ def run_suite(
                 raise ValueError(f"Ambiguous game prefix {requested}: {matches}")
     else:
         selected = available
+
+    requested_game_budget = game_time_budget_seconds
+    effective_game_budget = game_time_budget_seconds
+    coverage_budget: float | None = None
+    waves = ceil(len(selected) / workers) if selected else 0
+    if coverage_reserve_fraction is not None:
+        if time_budget_seconds is None or game_time_budget_seconds is None:
+            raise ValueError(
+                "coverage-safe scheduling requires global and per-game time budgets"
+            )
+        reserve = float(coverage_reserve_fraction)
+        if not 0 <= reserve < 1:
+            raise ValueError("coverage_reserve_fraction must be in [0, 1)")
+        coverage_budget = float(time_budget_seconds) * (1.0 - reserve) / max(1, waves)
+        effective_game_budget = min(float(game_time_budget_seconds), coverage_budget)
+
+    runtime_budget = {
+        "selected_games": len(selected),
+        "workers": workers,
+        "waves": waves,
+        "global_budget_seconds": time_budget_seconds,
+        "requested_game_budget_seconds": requested_game_budget,
+        "coverage_reserve_fraction": coverage_reserve_fraction,
+        "coverage_safe_game_budget_seconds": coverage_budget,
+        "effective_game_budget_seconds": effective_game_budget,
+        "coverage_limited": bool(
+            requested_game_budget is not None
+            and effective_game_budget is not None
+            and effective_game_budget + 1e-9 < requested_game_budget
+        ),
+    }
 
     card_id = arc.open_scorecard(tags=tags or ["arc3-frontier"])
     started_wall = time.time()
@@ -279,7 +318,7 @@ def run_suite(
                 max_actions=max_actions,
                 max_resets=max_resets,
                 stop_at_monotonic=stop_at,
-                game_time_budget_seconds=game_time_budget_seconds,
+                game_time_budget_seconds=effective_game_budget,
             )
         except BaseException as exc:
             return _error_result(game_id, exc)
@@ -318,6 +357,7 @@ def run_suite(
     payload = {
         "elapsed_seconds": round(time.time() - started_wall, 3),
         "policy": tags or ["arc3-frontier"],
+        "runtime_budget": runtime_budget,
         "games": sorted(results, key=lambda x: x["game_id"]),
         "scorecard": scorecard.model_dump(mode="json") if scorecard else None,
         "diagnostics": {
