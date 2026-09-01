@@ -44,6 +44,10 @@ on:
       - 'tests/test_v013_*.py'
       - '.github/workflows/swarm-ci.yml'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   swarm-contract:
     runs-on: ubuntu-latest
