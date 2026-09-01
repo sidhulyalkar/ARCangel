@@ -14,6 +14,9 @@ from arc3lab.arena.orchestrator import ArenaOrchestrator
 from arc3lab.arena.schema import ArenaManifest
 
 
+PUBLIC_REGISTRY = Path("artifacts/arena/v013/splits.public.json")
+
+
 def _server_ready(base_url: str) -> bool:
     try:
         response = requests.get(f"{base_url.rstrip('/')}/models", timeout=3.0)
@@ -22,24 +25,51 @@ def _server_ready(base_url: str) -> bool:
         return False
 
 
-def _launch_server_if_needed(args: argparse.Namespace) -> Any | None:
-    if _server_ready(args.base_url):
-        print(f"REUSING MODEL SERVER: {args.base_url}", flush=True)
-        return None
+def _model_identity(path: str) -> str:
+    model_path = Path(path)
+    pieces = [str(model_path)]
+    config = model_path / "config.json"
+    if config.exists():
+        try:
+            pieces.append(config.read_text(encoding="utf-8")[:12000])
+        except Exception:
+            pass
+    return "".join(ch for ch in " ".join(pieces).lower() if ch.isalnum())
+
+
+def _launch_server(args: argparse.Namespace) -> Any | None:
+    ready = _server_ready(args.base_url)
     if args.server_mode == "reuse":
-        raise RuntimeError(f"No OpenAI-compatible model server is ready at {args.base_url}")
+        if not ready:
+            raise RuntimeError(f"No OpenAI-compatible model server is ready at {args.base_url}")
+        print(
+            "REUSING EXTERNALLY PROVISIONED MODEL SERVER: identity is caller-owned",
+            flush=True,
+        )
+        return None
+
+    if ready:
+        raise RuntimeError(
+            f"A server is already listening at {args.base_url}. Stop it or opt in with --server-mode reuse."
+        )
     if args.base_url.rstrip("/") != "http://127.0.0.1:8000/v1":
-        raise ValueError("automatic launch currently requires the default localhost:8000 endpoint")
+        raise ValueError("managed launch requires the default localhost:8000 endpoint")
 
     from arc3lab.model import discover_model_path, launch_vllm
 
     model_path = args.model_path or discover_model_path()
     if not model_path:
-        raise FileNotFoundError(
-            "No local model was discovered. Supply --model-path or start the shared server first."
+        raise FileNotFoundError("No local Qwen model was discovered. Supply --model-path.")
+    identity = _model_identity(model_path)
+    required = ("qwen", "38", "27b", "fp8")
+    missing = [token for token in required if token not in identity]
+    if missing:
+        raise RuntimeError(
+            f"First tournament requires Qwen3.8 27B FP8; missing {missing}: {model_path}"
         )
+
     os.environ.setdefault("VLLM_DISABLED_KERNELS", "FlashInferFP8ScaledMMLinearKernel")
-    print(f"LAUNCHING SHARED QWEN SERVER: {model_path}", flush=True)
+    print(f"LAUNCHING VERIFIED SHARED QWEN3.8 27B FP8 SERVER: {model_path}", flush=True)
     return launch_vllm(
         model_path,
         max_model_len=16384,
@@ -72,16 +102,12 @@ def main() -> int:
     ap.add_argument("--manifest", default="configs/swarm-v013.json")
     ap.add_argument("--root", default="artifacts/arena/v013")
     ap.add_argument(
-        "--public-registry",
-        default="artifacts/arena/v013/splits.public.json",
-    )
-    ap.add_argument(
         "--private-registry",
         default="artifacts/arena/v013/splits.private.json",
     )
     ap.add_argument("--base-url", default="http://127.0.0.1:8000/v1")
     ap.add_argument("--model-path", default=os.getenv("ARC3_MODEL_PATH", ""))
-    ap.add_argument("--server-mode", choices=["auto", "reuse"], default="auto")
+    ap.add_argument("--server-mode", choices=["launch", "reuse"], default="launch")
     ap.add_argument("--server-max-sequences", type=int, default=16)
     ap.add_argument("--screen-min-delta", type=float, default=-0.08)
     ap.add_argument("--validation-min-delta", type=float, default=-0.05)
@@ -92,10 +118,10 @@ def main() -> int:
     ap.add_argument("--plan-only", action="store_true")
     args = ap.parse_args()
 
-    public_registry = Path(args.public_registry)
-    if not public_registry.exists():
+    if not PUBLIC_REGISTRY.exists():
         raise FileNotFoundError(
-            f"Public split registry is missing: {public_registry}. Run scripts/init_swarm_splits.py first."
+            f"Public split registry is missing: {PUBLIC_REGISTRY}. "
+            "Run scripts/init_swarm_splits.py first."
         )
     if args.judge and not Path(args.private_registry).exists():
         raise FileNotFoundError("--judge requires the private split registry")
@@ -125,7 +151,7 @@ def main() -> int:
     os.environ["ARC3_MODEL_BASE_URL"] = args.base_url
     os.environ.setdefault("ARC3_MODEL_NAME", "arc3")
     os.environ.setdefault("OMP_NUM_THREADS", "1")
-    server = _launch_server_if_needed(args)
+    server = _launch_server(args)
     try:
         if not _server_ready(args.base_url):
             raise RuntimeError("Shared model server failed readiness after launch")
