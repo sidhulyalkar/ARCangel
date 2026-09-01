@@ -7,6 +7,7 @@ from pathlib import Path
 from arc3lab.arena.orchestrator import ArenaOrchestrator
 from arc3lab.arena.research_agents import ResearchSwarm
 from arc3lab.arena.schema import ArenaManifest
+from arc3lab.arena.swarm_intelligence import SwarmMemory
 
 
 def build_context(
@@ -39,13 +40,14 @@ def build_context(
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Run independent frontier-model ARC research roles")
+    ap = argparse.ArgumentParser(description="Run independent frontier-model ARC research particles")
     ap.add_argument("--providers", required=True)
     ap.add_argument("--manifest", default="configs/swarm-v013.json")
     ap.add_argument("--arena-root", default="artifacts/arena/v013")
     ap.add_argument("--repo-root", default=".")
     ap.add_argument("--include-list", default="configs/swarm-packet-files.txt")
     ap.add_argument("--output-dir", default="artifacts/arena/v013/proposals/round1")
+    ap.add_argument("--memory", default="artifacts/arena/v013/swarm-memory.jsonl")
     ap.add_argument("--max-context-chars", type=int, default=120000)
     ap.add_argument("--max-requests", type=int, default=20)
     ap.add_argument("--max-workers", type=int, default=4)
@@ -55,11 +57,21 @@ def main() -> int:
     manifest = ArenaManifest.load(args.manifest)
     swarm = ResearchSwarm.load(args.providers, max_workers=args.max_workers)
     calls = swarm.plan()
+    memory = SwarmMemory(args.memory)
+    particle_guidance = {
+        call.key: memory.guidance(call.provider_id, call.role_id)
+        for call in calls[: args.max_requests]
+    }
     if args.plan_only:
         print(
             json.dumps(
                 [
-                    {"provider_id": call.provider_id, "role_id": call.role_id, "model": call.model}
+                    {
+                        "provider_id": call.provider_id,
+                        "role_id": call.role_id,
+                        "model": call.model,
+                        "has_measured_guidance": bool(memory.read()),
+                    }
                     for call in calls[: args.max_requests]
                 ],
                 indent=2,
@@ -80,12 +92,14 @@ def main() -> int:
         context=context,
         output_dir=args.output_dir,
         max_requests=args.max_requests,
+        particle_guidance=particle_guidance,
     )
     summary = {
         "experiment_id": manifest.experiment_id,
         "requested": min(len(calls), args.max_requests),
         "valid": sum(proposal.valid for proposal in proposals),
         "invalid": sum(not proposal.valid for proposal in proposals),
+        "memory_outcomes": len(memory.read()),
         "proposal_files": [f"{proposal.provider_id}__{proposal.role_id}.json" for proposal in proposals],
     }
     print(json.dumps(summary, indent=2))
