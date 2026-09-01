@@ -46,6 +46,18 @@ def _error_result(game_id: str, exc: BaseException) -> dict[str, Any]:
         "visual_expectation_mismatches": 0,
         "world_model_delegations": 0,
         "goal_hypotheses": 0,
+        "expectation_checks": 0,
+        "expectation_mismatches": 0,
+        "hypothesis_tests": 0,
+        "hypothesis_test_failures": 0,
+        "world_model_validations": 0,
+        "world_model_validation_failures": 0,
+        "analysis_rounds": 0,
+        "model_authored_actions": 0,
+        "model_authored_probes": 0,
+        "model_authored_plan_actions": 0,
+        "emergency_transport_fallbacks": 0,
+        "no_plan_rounds": 0,
         "deadline_exhausted": False,
         "error": f"{type(exc).__name__}: {exc}"[:1000],
     }
@@ -100,8 +112,6 @@ def run_game(
         if state == "GAME_OVER":
             if resets >= max_resets:
                 break
-            # Record the losing transition before retrying. In competition mode RESET
-            # restarts the current level, so retain the game's learned mechanics/memory.
             try:
                 policy.observe(frame)
             except Exception:
@@ -117,13 +127,10 @@ def run_game(
         before_level = int(getattr(frame, "levels_completed", 0))
         spec = policy.choose(scene)
         if spec.action_id not in scene.available_actions:
-            # Never burn a scored action on an illegal model output.
             legal = next((a for a in scene.available_actions if a != 0), 0)
             spec = ActionSpec(legal, reason="illegal-output guard", confidence=0.0)
 
         action = GameAction.from_id(spec.action_id)
-        # GameAction enum members carry mutable action_data. Calling set_data() can race
-        # across concurrent games for ACTION6. Pass thread-local data directly instead.
         frame = env.step(
             action,
             data=spec.data,
@@ -137,7 +144,6 @@ def run_game(
             )
             level_start_actions = actions
 
-    # Observe terminal/latest frame once so the final transition is not lost.
     try:
         policy.observe(frame)
     except Exception:
@@ -166,22 +172,49 @@ def run_game(
         "visual_packet_calls": int(getattr(policy, "visual_packet_calls", 0)),
         "multiview_calls": int(getattr(policy, "multiview_calls", 0)),
         "frontier_fallback_actions": int(getattr(policy, "frontier_fallback_actions", 0)),
-        "frontier_known_states": len(getattr(getattr(policy, "exploration_frontier", None), "nodes", {})),
+        "frontier_known_states": len(
+            getattr(getattr(policy, "exploration_frontier", None), "nodes", {})
+        ),
         "visual_candidate_selections": int(getattr(policy, "visual_candidate_selections", 0)),
         "visual_goal_updates": int(getattr(policy, "visual_goal_updates", 0)),
-        "visual_affordance_observations": int(getattr(policy, "visual_affordance_observations", 0)),
-        "visual_expectation_mismatches": int(getattr(policy, "visual_expectation_mismatches", 0)),
+        "visual_affordance_observations": int(
+            getattr(policy, "visual_affordance_observations", 0)
+        ),
+        "visual_expectation_mismatches": int(
+            getattr(policy, "visual_expectation_mismatches", 0)
+        ),
         "final_orientation_entropy": float(
             getattr(policy, "last_perceptual_state", {}).get("orientation_entropy", 1.0)
-        ) if isinstance(getattr(policy, "last_perceptual_state", {}), dict) else 1.0,
+        )
+        if isinstance(getattr(policy, "last_perceptual_state", {}), dict)
+        else 1.0,
         "final_perceptual_mode": str(
             getattr(policy, "last_perceptual_state", {}).get("recommended_mode", "")
-        ) if isinstance(getattr(policy, "last_perceptual_state", {}), dict) else "",
+        )
+        if isinstance(getattr(policy, "last_perceptual_state", {}), dict)
+        else "",
         "world_model_delegations": int(getattr(policy, "world_model_delegations", 0)),
         "goal_hypotheses": len(getattr(policy, "goals", [])),
+        "expectation_checks": int(getattr(policy, "expectation_checks", 0)),
+        "expectation_mismatches": int(getattr(policy, "expectation_mismatches", 0)),
+        "hypothesis_tests": int(getattr(policy, "hypothesis_tests", 0)),
+        "hypothesis_test_failures": int(getattr(policy, "hypothesis_test_failures", 0)),
+        "world_model_validations": int(getattr(policy, "world_model_validations", 0)),
+        "world_model_validation_failures": int(
+            getattr(policy, "world_model_validation_failures", 0)
+        ),
+        "analysis_rounds": int(getattr(policy, "analysis_rounds", 0)),
+        "model_authored_actions": int(getattr(policy, "model_authored_actions", 0)),
+        "model_authored_probes": int(getattr(policy, "model_authored_probes", 0)),
+        "model_authored_plan_actions": int(getattr(policy, "model_authored_plan_actions", 0)),
+        "emergency_transport_fallbacks": int(
+            getattr(policy, "emergency_transport_fallbacks", 0)
+        ),
+        "no_plan_rounds": int(getattr(policy, "no_plan_rounds", 0)),
         "predictive_summary": (
             getattr(policy, "predictive").summary()
-            if getattr(policy, "predictive", None) is not None else None
+            if getattr(policy, "predictive", None) is not None
+            else None
         ),
         "belief_count": len(getattr(policy, "beliefs", [])),
         "elapsed_seconds": round(time.monotonic() - game_started_mono, 3),
@@ -248,7 +281,7 @@ def run_suite(
                 stop_at_monotonic=stop_at,
                 game_time_budget_seconds=game_time_budget_seconds,
             )
-        except BaseException as exc:  # submission robustness: preserve other games
+        except BaseException as exc:
             return _error_result(game_id, exc)
 
     try:
@@ -274,11 +307,13 @@ def run_suite(
                     except BaseException as exc:
                         results.append(_error_result(gid, exc))
     finally:
-        # Closing the single scorecard is more important than propagating one game error.
         try:
             scorecard = arc.close_scorecard(card_id)
         except Exception as exc:
             results.append(_error_result("__scorecard_close__", exc))
+
+    def sum_metric(name: str) -> int:
+        return sum(int(row.get(name, 0)) for row in results)
 
     payload = {
         "elapsed_seconds": round(time.time() - started_wall, 3),
@@ -287,37 +322,62 @@ def run_suite(
         "scorecard": scorecard.model_dump(mode="json") if scorecard else None,
         "diagnostics": {
             "errors": sum(bool(x.get("error")) for x in results),
-            "deadline_exhausted_games": sum(bool(x.get("deadline_exhausted")) for x in results),
-            "model_calls": sum(int(x.get("model_calls", 0)) for x in results),
-            "model_failures": sum(int(x.get("model_failures", 0)) for x in results),
-            "reasoning_cycles": sum(int(x.get("reasoning_cycles", 0)) for x in results),
-            "tool_calls": sum(int(x.get("tool_calls", 0)) for x in results),
-            "tool_failures": sum(int(x.get("tool_failures", 0)) for x in results),
-            "queued_actions_used": sum(int(x.get("queued_actions_used", 0)) for x in results),
-            "fallback_actions": sum(int(x.get("fallback_actions", 0)) for x in results),
-            "prediction_mismatches": sum(int(x.get("prediction_mismatches", 0)) for x in results),
-            "spatial_plans_requested": sum(int(x.get("spatial_plans_requested", 0)) for x in results),
-            "spatial_plans_compiled": sum(int(x.get("spatial_plans_compiled", 0)) for x in results),
-            "spatial_plan_actions": sum(int(x.get("spatial_plan_actions", 0)) for x in results),
-            "spatial_plan_mismatches": sum(int(x.get("spatial_plan_mismatches", 0)) for x in results),
-            "visual_packet_calls": sum(int(x.get("visual_packet_calls", 0)) for x in results),
-            "multiview_calls": sum(int(x.get("multiview_calls", 0)) for x in results),
-            "frontier_fallback_actions": sum(int(x.get("frontier_fallback_actions", 0)) for x in results),
-            "frontier_known_states": sum(int(x.get("frontier_known_states", 0)) for x in results),
-            "visual_candidate_selections": sum(int(x.get("visual_candidate_selections", 0)) for x in results),
-            "visual_goal_updates": sum(int(x.get("visual_goal_updates", 0)) for x in results),
-            "visual_affordance_observations": sum(int(x.get("visual_affordance_observations", 0)) for x in results),
-            "visual_expectation_mismatches": sum(int(x.get("visual_expectation_mismatches", 0)) for x in results),
+            "deadline_exhausted_games": sum(
+                bool(x.get("deadline_exhausted")) for x in results
+            ),
+            "model_calls": sum_metric("model_calls"),
+            "model_failures": sum_metric("model_failures"),
+            "reasoning_cycles": sum_metric("reasoning_cycles"),
+            "tool_calls": sum_metric("tool_calls"),
+            "tool_failures": sum_metric("tool_failures"),
+            "queued_actions_used": sum_metric("queued_actions_used"),
+            "fallback_actions": sum_metric("fallback_actions"),
+            "prediction_mismatches": sum_metric("prediction_mismatches"),
+            "spatial_plans_requested": sum_metric("spatial_plans_requested"),
+            "spatial_plans_compiled": sum_metric("spatial_plans_compiled"),
+            "spatial_plan_actions": sum_metric("spatial_plan_actions"),
+            "spatial_plan_mismatches": sum_metric("spatial_plan_mismatches"),
+            "visual_packet_calls": sum_metric("visual_packet_calls"),
+            "multiview_calls": sum_metric("multiview_calls"),
+            "frontier_fallback_actions": sum_metric("frontier_fallback_actions"),
+            "frontier_known_states": sum_metric("frontier_known_states"),
+            "visual_candidate_selections": sum_metric("visual_candidate_selections"),
+            "visual_goal_updates": sum_metric("visual_goal_updates"),
+            "visual_affordance_observations": sum_metric("visual_affordance_observations"),
+            "visual_expectation_mismatches": sum_metric("visual_expectation_mismatches"),
             "mean_final_orientation_entropy": round(
-                sum(float(x.get("final_orientation_entropy", 1.0)) for x in results) / max(len(results), 1),
+                sum(float(x.get("final_orientation_entropy", 1.0)) for x in results)
+                / max(len(results), 1),
                 4,
             ),
             "perceptual_modes": {
                 mode: sum(int(x.get("final_perceptual_mode", "") == mode) for x in results)
-                for mode in sorted({str(x.get("final_perceptual_mode", "")) for x in results if x.get("final_perceptual_mode")})
+                for mode in sorted(
+                    {
+                        str(x.get("final_perceptual_mode", ""))
+                        for x in results
+                        if x.get("final_perceptual_mode")
+                    }
+                )
             },
-            "world_model_delegations": sum(int(x.get("world_model_delegations", 0)) for x in results),
-            "goal_hypotheses": sum(int(x.get("goal_hypotheses", 0)) for x in results),
+            "world_model_delegations": sum_metric("world_model_delegations"),
+            "goal_hypotheses": sum_metric("goal_hypotheses"),
+            "expectation_checks": sum_metric("expectation_checks"),
+            "expectation_mismatches": sum_metric("expectation_mismatches"),
+            "hypothesis_tests": sum_metric("hypothesis_tests"),
+            "hypothesis_test_failures": sum_metric("hypothesis_test_failures"),
+            "world_model_validations": sum_metric("world_model_validations"),
+            "world_model_validation_failures": sum_metric(
+                "world_model_validation_failures"
+            ),
+            "analysis_rounds": sum_metric("analysis_rounds"),
+            "model_authored_actions": sum_metric("model_authored_actions"),
+            "model_authored_probes": sum_metric("model_authored_probes"),
+            "model_authored_plan_actions": sum_metric("model_authored_plan_actions"),
+            "emergency_transport_fallbacks": sum_metric(
+                "emergency_transport_fallbacks"
+            ),
+            "no_plan_rounds": sum_metric("no_plan_rounds"),
         },
     }
     if output_path:
