@@ -1,5 +1,12 @@
 from arc3lab.arena.ledger import ResultLedger
+from arc3lab.arena.metrics import suite_payload_to_result
 from arc3lab.arena.orchestrator import ArenaOrchestrator
+from arc3lab.arena.research_agents import (
+    ProviderSpec,
+    ResearchCall,
+    ResearchProposal,
+    ResearchSwarm,
+)
 from arc3lab.arena.research_packet import DEFAULT_ROLES, ResearchPacketBuilder, ResearchRole
 from arc3lab.arena.schema import ArenaManifest, ArenaResult, ContestantSpec, PlannedRun
 from arc3lab.arena.scoring import AggregateScore, PromotionDecision
@@ -14,8 +21,13 @@ __all__ = [
     "DEFAULT_ROLES",
     "PlannedRun",
     "PromotionDecision",
+    "ProviderSpec",
+    "ResearchCall",
     "ResearchPacketBuilder",
+    "ResearchProposal",
     "ResearchRole",
+    "ResearchSwarm",
     "ResultLedger",
     "SplitRegistry",
+    "suite_payload_to_result",
 ]
