@@ -7,6 +7,8 @@ on:
       - 'scripts/run_swarm_lab.py'
       - 'scripts/run_arena_contestant.py'
       - 'scripts/run_research_swarm.py'
+      - 'scripts/init_swarm_splits.py'
+      - 'scripts/plan_research_round.py'
       - 'configs/swarm-v013.json'
       - 'configs/swarm-packet-files.txt'
       - 'configs/research-providers.example.json'
@@ -18,6 +20,8 @@ on:
       - 'scripts/run_swarm_lab.py'
       - 'scripts/run_arena_contestant.py'
       - 'scripts/run_research_swarm.py'
+      - 'scripts/init_swarm_splits.py'
+      - 'scripts/plan_research_round.py'
       - 'configs/swarm-v013.json'
       - 'configs/swarm-packet-files.txt'
       - 'configs/research-providers.example.json'
@@ -46,6 +50,8 @@ jobs:
           scripts/run_swarm_lab.py
           scripts/run_arena_contestant.py
           scripts/run_research_swarm.py
+          scripts/init_swarm_splits.py
+          scripts/plan_research_round.py
           tests/test_v013_swarm_arena.py
       - run: >-
           python -m compileall -q
@@ -53,3 +59,5 @@ jobs:
           scripts/run_swarm_lab.py
           scripts/run_arena_contestant.py
           scripts/run_research_swarm.py
+          scripts/init_swarm_splits.py
+          scripts/plan_research_round.py
