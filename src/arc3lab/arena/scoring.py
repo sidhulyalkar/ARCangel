@@ -33,7 +33,10 @@ class PromotionDecision:
 
 
 def score_result(result: ArenaResult, weights: dict[str, float]) -> float:
-    if result.status != "ok":
+    # Hard execution failures carry no trustworthy behavioral signal. A degraded suite,
+    # however, can contain many valid games and should retain its metric gradient while
+    # paying explicit failure/timeout penalties below.
+    if result.status not in {"ok", "degraded"}:
         return -1.0
     score = 0.0
     norm = sum(abs(weight) for weight in weights.values()) or 1.0
@@ -64,8 +67,13 @@ def aggregate_results(
         sigma = pstdev(raw_scores) if len(raw_scores) > 1 else 0.0
         # A one-standard-error lower bound rewards repeatability instead of lucky runs.
         robust = mean(raw_scores) - sigma / sqrt(max(1, len(raw_scores)))
-        failures = mean(1.0 if row.status != "ok" else row.metrics.get("failure_rate", 0.0) for row in rows)
-        emergency = mean(row.metrics.get("emergency_fraction", 0.0) for row in rows)
+        failures = mean(
+            1.0
+            if row.status not in {"ok", "degraded"}
+            else float(row.metrics.get("failure_rate", 0.0))
+            for row in rows
+        )
+        emergency = mean(float(row.metrics.get("emergency_fraction", 0.0)) for row in rows)
         aggregates[key] = AggregateScore(
             contestant_id=key[0],
             split=key[1],
