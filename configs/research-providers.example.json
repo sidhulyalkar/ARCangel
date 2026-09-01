@@ -1,0 +1,24 @@
+{
+  "providers": [
+    {
+      "id": "nvidia-openai-compatible",
+      "base_url": "https://integrate.api.nvidia.com/v1",
+      "model": "REPLACE_WITH_MODEL_ID",
+      "api_key_env": "NVIDIA_API_KEY",
+      "roles": ["minimalist", "scientist", "explorer", "planner", "vision", "memory"],
+      "max_tokens": 3000,
+      "timeout_seconds": 600,
+      "enabled": false
+    },
+    {
+      "id": "custom-openai-compatible",
+      "base_url": "https://REPLACE_WITH_ENDPOINT/v1",
+      "model": "REPLACE_WITH_MODEL_ID",
+      "api_key_env": "RESEARCH_LLM_API_KEY",
+      "roles": ["red_team", "generalization", "integrator"],
+      "max_tokens": 3000,
+      "timeout_seconds": 600,
+      "enabled": false
+    }
+  ]
+}
