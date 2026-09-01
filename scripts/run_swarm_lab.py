@@ -22,6 +22,8 @@ def validate_manifest(manifest: ArenaManifest) -> list[str]:
     if len(ids) != len(set(ids)):
         errors.append("contestant ids must be unique")
     known = set(ids)
+    if manifest.leaderboard_control_id and manifest.leaderboard_control_id not in known:
+        errors.append(f"unknown leaderboard control {manifest.leaderboard_control_id}")
     for contestant in manifest.contestants:
         if contestant.control_id and contestant.control_id not in known:
             errors.append(
@@ -46,6 +48,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
                 "contestants": len(manifest.contestants),
                 "enabled": sum(contestant.enabled for contestant in manifest.contestants),
                 "seeds": list(manifest.seeds),
+                "leaderboard_control_id": manifest.leaderboard_control_id,
                 "status": "VALID",
             },
             indent=2,
@@ -92,6 +95,20 @@ def cmd_ingest_result(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_record_kaggle(args: argparse.Namespace) -> int:
+    _, lab = load_lab(args)
+    result = lab.record_kaggle_score(
+        contestant_id=args.contestant,
+        score=args.score,
+        seed=args.seed,
+        source=args.source,
+        artifact_sha256=args.artifact_sha256,
+        runtime_seconds=args.runtime_seconds,
+    )
+    print(json.dumps(result.to_dict(), indent=2))
+    return 0
+
+
 def cmd_score(args: argparse.Namespace) -> int:
     _, lab = load_lab(args)
     card = lab.scorecard(include_blind=args.include_blind)
@@ -106,9 +123,26 @@ def cmd_promote(args: argparse.Namespace) -> int:
     _, lab = load_lab(args)
     promoted = lab.promotion_queue()
     payload = {"experiment_id": lab.manifest.experiment_id, "promoted": promoted}
-    Path(args.output).write_text(json.dumps(payload, indent=2) + "\n")
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, indent=2) + "\n")
     print(json.dumps(payload, indent=2))
     return 0 if promoted else 2
+
+
+def cmd_leaderboard(args: argparse.Namespace) -> int:
+    _, lab = load_lab(args)
+    queue = lab.leaderboard_queue()
+    payload = {
+        "experiment_id": lab.manifest.experiment_id,
+        "leaderboard_control_id": lab.manifest.leaderboard_control_id,
+        "nominees": queue,
+    }
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, indent=2) + "\n")
+    print(json.dumps(payload, indent=2))
+    return 0 if queue else 2
 
 
 def cmd_split(args: argparse.Namespace) -> int:
@@ -160,11 +194,23 @@ def parser() -> argparse.ArgumentParser:
     ingest_suite = sub.add_parser("ingest-suite")
     ingest_suite.add_argument("--suite", required=True)
     ingest_suite.add_argument("--contestant", required=True)
-    ingest_suite.add_argument("--split", required=True, choices=["dev", "validation", "blind", "kaggle"])
+    ingest_suite.add_argument(
+        "--split",
+        required=True,
+        choices=["dev", "validation", "blind", "kaggle"],
+    )
     ingest_suite.add_argument("--seed", required=True, type=int)
 
     ingest_result = sub.add_parser("ingest-result")
     ingest_result.add_argument("--result", required=True)
+
+    kaggle = sub.add_parser("record-kaggle")
+    kaggle.add_argument("--contestant", required=True)
+    kaggle.add_argument("--score", required=True, type=float)
+    kaggle.add_argument("--seed", required=True, type=int)
+    kaggle.add_argument("--source", required=True)
+    kaggle.add_argument("--artifact-sha256", default="")
+    kaggle.add_argument("--runtime-seconds", type=float)
 
     score = sub.add_parser("score")
     score.add_argument("--output", default="artifacts/arena/v013/scorecard.json")
@@ -172,6 +218,12 @@ def parser() -> argparse.ArgumentParser:
 
     promote = sub.add_parser("promote")
     promote.add_argument("--output", default="artifacts/arena/v013/promotion.json")
+
+    leaderboard = sub.add_parser("leaderboard")
+    leaderboard.add_argument(
+        "--output",
+        default="artifacts/arena/v013/leaderboard-nominations.json",
+    )
 
     split = sub.add_parser("split")
     split.add_argument("--games", required=True)
@@ -184,7 +236,10 @@ def parser() -> argparse.ArgumentParser:
     packet = sub.add_parser("packet")
     packet.add_argument("--repo-root", default=".")
     packet.add_argument("--include-list", default="configs/swarm-packet-files.txt")
-    packet.add_argument("--output", default="artifacts/arena/v013/arcangel_research_packet.tar.gz")
+    packet.add_argument(
+        "--output",
+        default="artifacts/arena/v013/arcangel_research_packet.tar.gz",
+    )
     return ap
 
 
@@ -200,10 +255,14 @@ def main() -> int:
         return cmd_ingest_suite(args)
     if args.command == "ingest-result":
         return cmd_ingest_result(args)
+    if args.command == "record-kaggle":
+        return cmd_record_kaggle(args)
     if args.command == "score":
         return cmd_score(args)
     if args.command == "promote":
         return cmd_promote(args)
+    if args.command == "leaderboard":
+        return cmd_leaderboard(args)
     if args.command == "split":
         return cmd_split(args)
     if args.command == "packet":
