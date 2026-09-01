@@ -43,6 +43,10 @@ def main() -> None:
     parser.add_argument("--max-tool-calls", type=int, default=96)
     parser.add_argument("--time-budget-seconds", type=float, default=25200.0)
     parser.add_argument("--game-time-budget-seconds", type=float, default=7800.0)
+    parser.add_argument("--coverage-reserve-fraction", type=float, default=0.05)
+    parser.add_argument("--notebook-limit-seconds", type=float, default=32400.0)
+    parser.add_argument("--setup-reserve-seconds", type=float, default=3600.0)
+    parser.add_argument("--expected-scored-games", type=int, default=110)
     parser.add_argument("--output", default="/kaggle/working/arcangel_v013_receipt.json")
     parser.add_argument("--seed", type=int, default=20260831)
     args = parser.parse_args()
@@ -51,6 +55,7 @@ def main() -> None:
     os.environ.setdefault("OMP_NUM_THREADS", "1")
     os.environ.setdefault("VLLM_DISABLED_KERNELS", "FlashInferFP8ScaledMMLinearKernel")
 
+    from arc3lab.arena.runtime_budget import audit_runtime_budget
     from arc3lab.evaluation.runner import run_suite
     from arc3lab.model import OpenAICompatLocalAdapter, discover_model_path, launch_vllm
     from arc3lab.policy.coding import CodingPolicy
@@ -59,6 +64,18 @@ def main() -> None:
 
     print(f"ARCANGEL SUBMISSION BUILD: {args.build_id}", flush=True)
     print(f"ARCANGEL CONTESTANT: {args.contestant_id} profile={args.profile}", flush=True)
+
+    envelope = audit_runtime_budget(
+        total_games=args.expected_scored_games,
+        workers=args.workers,
+        notebook_limit_seconds=args.notebook_limit_seconds,
+        setup_reserve_seconds=args.setup_reserve_seconds,
+        global_budget_seconds=args.time_budget_seconds,
+        requested_game_budget_seconds=args.game_time_budget_seconds,
+        coverage_reserve_fraction=args.coverage_reserve_fraction,
+    )
+    print("COMPETITION RUNTIME ENVELOPE:", json.dumps(envelope.to_dict(), sort_keys=True), flush=True)
+
     model_path = args.model_path or discover_model_path()
     if not model_path:
         raise FileNotFoundError("No local Qwen 27B FP8 model was discovered under /kaggle/input")
@@ -171,6 +188,7 @@ def main() -> None:
             workers=args.workers,
             time_budget_seconds=args.time_budget_seconds,
             game_time_budget_seconds=args.game_time_budget_seconds,
+            coverage_reserve_fraction=args.coverage_reserve_fraction,
             tags=["arcangel-v013", args.contestant_id, args.profile, "qwen38"],
             output_path=args.output,
         )
@@ -179,13 +197,21 @@ def main() -> None:
         out["profile"] = args.profile
         out["model_path"] = model_path
         out["model_family"] = "qwen3.8-27b-fp8"
+        out["competition_runtime_envelope"] = envelope.to_dict()
         pathlib.Path(args.output).write_text(json.dumps(out, indent=2), encoding="utf-8")
         diagnostics = dict(out.get("diagnostics") or {})
+        runtime_budget = dict(out.get("runtime_budget") or {})
+        print("campaign runtime budget:", json.dumps(runtime_budget, sort_keys=True), flush=True)
         print("campaign diagnostics:", json.dumps(diagnostics, sort_keys=True), flush=True)
         if int(diagnostics.get("model_failures", 0)) != 0:
             raise RuntimeError("candidate had model transport failures; inspect receipt and vLLM log")
         if int(diagnostics.get("errors", 0)) != 0:
             raise RuntimeError("candidate had environment/runner errors; inspect receipt")
+        skipped = int(diagnostics.get("deadline_exhausted_games", 0))
+        if skipped:
+            raise RuntimeError(
+                f"coverage gate failed: {skipped} games exhausted a deadline; inspect runtime budget"
+            )
         print(f"V013 CANDIDATE CAMPAIGN PASS: {args.build_id}", flush=True)
     finally:
         stop.set()
