@@ -9,6 +9,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from arc3lab.arena.research_context import (
+    assert_research_payload_safe,
+    sanitize_research_payload,
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ResearchRole:
@@ -32,7 +37,7 @@ DEFAULT_ROLES: tuple[ResearchRole, ...] = (
 
 
 class ResearchPacketBuilder:
-    """Build deterministic, blind-safe packets for independent frontier research agents."""
+    """Build deterministic, private/leaderboard-safe packets for research agents."""
 
     def __init__(self, repo_root: str | Path) -> None:
         self.repo_root = Path(repo_root)
@@ -57,12 +62,8 @@ and leaderboard performance are separate gates.
 
     @staticmethod
     def _safe_scorecard(scorecard: dict[str, object]) -> dict[str, object]:
-        safe = json.loads(json.dumps(scorecard))
-        rankings = safe.get("rankings")
-        if isinstance(rankings, dict):
-            rankings.pop("blind", None)
-        safe.pop("blind_results", None)
-        safe.pop("private_split_registry", None)
+        safe = sanitize_research_payload(json.loads(json.dumps(scorecard)))
+        assert_research_payload_safe(safe)
         return safe
 
     def build(
@@ -80,8 +81,8 @@ and leaderboard performance are separate gates.
         ).encode()
         files["README_RESEARCH_PACKET.md"] = (
             "# ARCangel research packet\n\n"
-            "This packet intentionally excludes blind split identities and blind outcomes. "
-            "Agents should develop against DEV and use VALIDATION only through the arena scorecard.\n"
+            "This packet intentionally excludes private BLIND state and dynamic Kaggle/leaderboard evidence. "
+            "Agents should invent against DEV and use VALIDATION only through the development scorecard.\n"
         ).encode()
         for role in roles:
             files[f"prompts/{role.role_id}.md"] = self.role_prompt(role, experiment_id).encode()
