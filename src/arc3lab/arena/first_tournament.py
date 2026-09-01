@@ -190,7 +190,8 @@ class FirstTournamentDirector:
             if row is None:
                 continue
             delta = row.robust_score - control.robust_score
-            if delta < threshold + self.dev_repeat_margin:
+            boundary = threshold + self.dev_repeat_margin
+            if delta + 1e-12 < boundary:
                 targets.append(contestant_id)
         return tuple(targets)
 
