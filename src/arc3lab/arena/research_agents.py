@@ -10,6 +10,11 @@ from typing import Any, Iterable
 import requests
 
 from arc3lab.arena.research_packet import DEFAULT_ROLES, ResearchPacketBuilder, ResearchRole
+from arc3lab.arena.swarm_intelligence import (
+    ResearchReview,
+    ReviewAssignment,
+    SwarmCouncil,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,10 +117,10 @@ class ResearchProposal:
 
 
 class ResearchSwarm:
-    """Run independent ARC research roles against OpenAI-compatible development endpoints.
+    """Run development-only frontier research particles and blinded peer review.
 
-    This module is development-only. Kaggle evaluation must remain offline. API credentials are read
-    from named environment variables and are never written into proposal artifacts.
+    The swarm may propose and prioritize experiments. It never sees BLIND identities and it never
+    promotes a candidate. Promotion remains owned by measured arena evidence.
     """
 
     def __init__(self, providers: Iterable[ProviderSpec], *, max_workers: int = 4) -> None:
@@ -152,38 +157,33 @@ class ResearchSwarm:
     def _role(role_id: str, roles: Iterable[ResearchRole]) -> ResearchRole:
         return next(role for role in roles if role.role_id == role_id)
 
-    def _call(
+    @staticmethod
+    def _missing_proposal(call: ResearchCall, reason: str) -> ResearchProposal:
+        return ResearchProposal(
+            provider_id=call.provider_id,
+            role_id=call.role_id,
+            hypothesis="",
+            experiment="",
+            target_metric="",
+            split="",
+            falsifier="",
+            implementation="",
+            failure_mode="",
+            raw_text=reason,
+            valid=False,
+        )
+
+    def _post_chat(
         self,
-        call: ResearchCall,
+        provider: ProviderSpec,
         *,
-        experiment_id: str,
-        context: str,
-        roles: Iterable[ResearchRole],
-    ) -> ResearchProposal:
-        provider = self._provider(call.provider_id)
+        system: str,
+        user: str,
+        temperature: float,
+    ) -> str:
         key = os.getenv(provider.api_key_env, "") if provider.api_key_env else ""
         if not key:
-            return ResearchProposal(
-                provider_id=call.provider_id,
-                role_id=call.role_id,
-                hypothesis="",
-                experiment="",
-                target_metric="",
-                split="",
-                falsifier="",
-                implementation="",
-                failure_mode="",
-                raw_text=f"MISSING_API_KEY:{provider.api_key_env}",
-                valid=False,
-            )
-        role = self._role(call.role_id, roles)
-        system = ResearchPacketBuilder.role_prompt(role, experiment_id)
-        user = (
-            "Study the blind-safe research context below. Return exactly one JSON object with keys "
-            "hypothesis, experiment, target_metric, split, falsifier, implementation, failure_mode. "
-            "Use DEV for invention and VALIDATION for selection; never request blind identities.\n\n"
-            + context
-        )
+            raise RuntimeError(f"MISSING_API_KEY:{provider.api_key_env}")
         response = requests.post(
             f"{provider.base_url}/chat/completions",
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
@@ -193,15 +193,78 @@ class ResearchSwarm:
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
-                "temperature": 0.2,
+                "temperature": temperature,
                 "max_tokens": provider.max_tokens,
             },
             timeout=provider.timeout_seconds,
         )
         response.raise_for_status()
         data = response.json()
-        text = str(data["choices"][0]["message"]["content"])
+        return str(data["choices"][0]["message"]["content"])
+
+    def _call(
+        self,
+        call: ResearchCall,
+        *,
+        experiment_id: str,
+        context: str,
+        roles: Iterable[ResearchRole],
+        guidance: str = "",
+    ) -> ResearchProposal:
+        provider = self._provider(call.provider_id)
+        role = self._role(call.role_id, roles)
+        system = ResearchPacketBuilder.role_prompt(role, experiment_id)
+        user = (
+            "Study the blind-safe research context below. Return exactly one JSON object with keys "
+            "hypothesis, experiment, target_metric, split, falsifier, implementation, failure_mode. "
+            "Use DEV for invention and VALIDATION for selection; never request blind identities.\n\n"
+        )
+        if guidance:
+            user += guidance + "\n\n"
+        user += context
+        try:
+            text = self._post_chat(provider, system=system, user=user, temperature=0.2)
+        except Exception as exc:
+            return self._missing_proposal(call, f"ERROR:{type(exc).__name__}:{exc}")
         return ResearchProposal.from_text(call.provider_id, call.role_id, text)
+
+    def _review_call(
+        self,
+        assignment: ReviewAssignment,
+        proposal: ResearchProposal,
+        *,
+        experiment_id: str,
+        context: str,
+        roles: Iterable[ResearchRole],
+    ) -> ResearchReview:
+        provider = self._provider(assignment.reviewer_provider_id)
+        role = self._role(assignment.reviewer_role_id, roles)
+        system = f"""# ARCangel blinded swarm reviewer: {role.role_id}
+
+Experiment: {experiment_id}
+Reviewer specialty: {role.mission}
+Adversarial question: {role.adversarial_question}
+
+The proposal author identity is deliberately hidden. Do not infer prestige, provider, or author intent.
+Judge whether this proposal deserves scarce experimental compute, not whether it sounds persuasive.
+No review can promote code. Measured DEV/VALIDATION results remain authoritative.
+"""
+        proposal_payload = SwarmCouncil.blind_payload(proposal)
+        user = (
+            "Review the anonymous proposal below against the blind-safe context. Return exactly one JSON object "
+            "with numeric scores in [0,1] for falsifiability, generalization, information_gain, feasibility, "
+            "redundancy, persuasion_risk, confidence; verdict must be advance, test_disagreement, or reject; "
+            "also provide strongest_objection and decisive_test. Do not request BLIND or Kaggle evidence.\n\n"
+            "# ANONYMOUS PROPOSAL\n"
+            + json.dumps(proposal_payload, indent=2)
+            + "\n\n# RESEARCH CONTEXT\n"
+            + context
+        )
+        try:
+            text = self._post_chat(provider, system=system, user=user, temperature=0.0)
+        except Exception as exc:
+            text = f"ERROR:{type(exc).__name__}:{exc}"
+        return ResearchReview.from_text(assignment, text)
 
     def run_independent_round(
         self,
@@ -211,6 +274,7 @@ class ResearchSwarm:
         output_dir: str | Path,
         max_requests: int = 20,
         roles: Iterable[ResearchRole] = DEFAULT_ROLES,
+        particle_guidance: dict[str, str] | None = None,
     ) -> list[ResearchProposal]:
         planned = self.plan(roles)
         if len(planned) > max_requests:
@@ -218,6 +282,8 @@ class ResearchSwarm:
         output = Path(output_dir)
         output.mkdir(parents=True, exist_ok=True)
         proposals: list[ResearchProposal] = []
+        guidance = particle_guidance or {}
+        role_tuple = tuple(roles)
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {
                 executor.submit(
@@ -225,7 +291,8 @@ class ResearchSwarm:
                     call,
                     experiment_id=experiment_id,
                     context=context,
-                    roles=tuple(roles),
+                    roles=role_tuple,
+                    guidance=guidance.get(call.key, ""),
                 ): call
                 for call in planned
             }
@@ -234,21 +301,67 @@ class ResearchSwarm:
                 try:
                     proposal = future.result()
                 except Exception as exc:
-                    proposal = ResearchProposal(
-                        provider_id=call.provider_id,
-                        role_id=call.role_id,
-                        hypothesis="",
-                        experiment="",
-                        target_metric="",
-                        split="",
-                        falsifier="",
-                        implementation="",
-                        failure_mode="",
-                        raw_text=f"ERROR:{type(exc).__name__}:{exc}",
-                        valid=False,
+                    proposal = self._missing_proposal(
+                        call,
+                        f"ERROR:{type(exc).__name__}:{exc}",
                     )
                 proposals.append(proposal)
                 (output / f"{call.key}.json").write_text(
                     json.dumps(proposal.to_dict(), indent=2) + "\n"
                 )
         return sorted(proposals, key=lambda proposal: (proposal.provider_id, proposal.role_id))
+
+    def run_review_round(
+        self,
+        *,
+        assignments: Iterable[ReviewAssignment],
+        proposals: Iterable[ResearchProposal],
+        experiment_id: str,
+        context: str,
+        output_dir: str | Path,
+        max_requests: int = 60,
+        roles: Iterable[ResearchRole] = DEFAULT_ROLES,
+    ) -> list[ResearchReview]:
+        planned = list(assignments)[: max(0, int(max_requests))]
+        proposal_map = {
+            f"{proposal.provider_id}__{proposal.role_id}": proposal
+            for proposal in proposals
+        }
+        output = Path(output_dir)
+        output.mkdir(parents=True, exist_ok=True)
+        reviews: list[ResearchReview] = []
+        role_tuple = tuple(roles)
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = {
+                executor.submit(
+                    self._review_call,
+                    assignment,
+                    proposal_map[assignment.proposal_key],
+                    experiment_id=experiment_id,
+                    context=context,
+                    roles=role_tuple,
+                ): assignment
+                for assignment in planned
+                if assignment.proposal_key in proposal_map
+            }
+            for future in as_completed(futures):
+                assignment = futures[future]
+                try:
+                    review = future.result()
+                except Exception as exc:
+                    review = ResearchReview.from_text(
+                        assignment,
+                        f"ERROR:{type(exc).__name__}:{exc}",
+                    )
+                reviews.append(review)
+                (output / f"{assignment.key}.json").write_text(
+                    json.dumps(review.to_dict(), indent=2) + "\n"
+                )
+        return sorted(
+            reviews,
+            key=lambda review: (
+                review.proposal_key,
+                review.reviewer_provider_id,
+                review.reviewer_role_id,
+            ),
+        )
