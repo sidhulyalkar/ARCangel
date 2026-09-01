@@ -60,6 +60,7 @@ def _error_result(game_id: str, exc: BaseException) -> dict[str, Any]:
         "emergency_transport_fallbacks": 0,
         "no_plan_rounds": 0,
         "deadline_exhausted": False,
+        "deadline_reason": "",
         "error": f"{type(exc).__name__}: {exc}"[:1000],
     }
 
@@ -75,12 +76,7 @@ def run_game(
     stop_at_monotonic: float | None = None,
     game_time_budget_seconds: float | None = None,
 ) -> dict[str, Any]:
-    """Run one environment without mutating shared GameAction enum state.
-
-    max_actions is a *safety ceiling*, not the primary budget. On Kaggle the shared
-    wall-clock deadline should be the primary limiter because valid ARC3 levels can
-    naturally require hundreds of actions.
-    """
+    """Run one environment without mutating shared GameAction enum state."""
     from arcengine import GameAction
 
     env = arc.make(game_id, scorecard_id=scorecard_id)
@@ -91,6 +87,7 @@ def run_game(
     level_start_actions = 0
     events: list[dict[str, Any]] = []
     deadline_exhausted = False
+    deadline_reason = ""
     game_started_mono = time.monotonic()
     game_stop_at = (
         game_started_mono + game_time_budget_seconds
@@ -102,9 +99,11 @@ def run_game(
         now = time.monotonic()
         if stop_at_monotonic is not None and now >= stop_at_monotonic:
             deadline_exhausted = True
+            deadline_reason = "global"
             break
         if game_stop_at is not None and now >= game_stop_at:
             deadline_exhausted = True
+            deadline_reason = "game_budget"
             break
 
         state = _state_name(frame)
@@ -220,6 +219,7 @@ def run_game(
         "belief_count": len(getattr(policy, "beliefs", [])),
         "elapsed_seconds": round(time.monotonic() - game_started_mono, 3),
         "deadline_exhausted": deadline_exhausted,
+        "deadline_reason": deadline_reason,
         "error": None,
     }
 
@@ -237,12 +237,7 @@ def run_suite(
     game_time_budget_seconds: float | None = None,
     coverage_reserve_fraction: float | None = None,
 ) -> dict[str, Any]:
-    """Run a scorecard with fail-soft per-game execution and a shared deadline.
-
-    When ``coverage_reserve_fraction`` is provided, the per-game cap is tightened only
-    when necessary to keep all discovered games schedulable within the shared deadline.
-    This prevents slow early games from starving later hidden games in a fixed worker pool.
-    """
+    """Run a scorecard with fail-soft execution and optional coverage-safe scheduling."""
     from arc_agi import Arcade
 
     workers = max(1, int(workers))
@@ -302,13 +297,16 @@ def run_suite(
     results: list[dict[str, Any]] = []
     scorecard = None
 
+    def skipped(game_id: str, message: str) -> dict[str, Any]:
+        row = _error_result(game_id, TimeoutError(message))
+        row["state"] = "SKIPPED_DEADLINE"
+        row["deadline_exhausted"] = True
+        row["deadline_reason"] = "before_start"
+        return row
+
     def safe_one(game_id: str) -> dict[str, Any]:
         if stop_at is not None and time.monotonic() >= stop_at:
-            return {
-                **_error_result(game_id, TimeoutError("shared deadline reached before start")),
-                "state": "SKIPPED_DEADLINE",
-                "deadline_exhausted": True,
-            }
+            return skipped(game_id, "shared deadline reached before start")
         try:
             return run_game(
                 arc,
@@ -327,13 +325,7 @@ def run_suite(
         if workers <= 1:
             for game_id in selected:
                 if stop_at is not None and time.monotonic() >= stop_at:
-                    results.append(
-                        {
-                            **_error_result(game_id, TimeoutError("shared deadline reached")),
-                            "state": "SKIPPED_DEADLINE",
-                            "deadline_exhausted": True,
-                        }
-                    )
+                    results.append(skipped(game_id, "shared deadline reached"))
                     continue
                 results.append(safe_one(game_id))
         else:
@@ -364,6 +356,15 @@ def run_suite(
             "errors": sum(bool(x.get("error")) for x in results),
             "deadline_exhausted_games": sum(
                 bool(x.get("deadline_exhausted")) for x in results
+            ),
+            "game_budget_exhausted_games": sum(
+                x.get("deadline_reason") == "game_budget" for x in results
+            ),
+            "global_deadline_exhausted_games": sum(
+                x.get("deadline_reason") == "global" for x in results
+            ),
+            "skipped_deadline_games": sum(
+                x.get("deadline_reason") == "before_start" for x in results
             ),
             "model_calls": sum_metric("model_calls"),
             "model_failures": sum_metric("model_failures"),
