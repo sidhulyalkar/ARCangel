@@ -8,6 +8,7 @@ on:
       - 'scripts/run_swarm_lab.py'
       - 'scripts/run_arena_contestant.py'
       - 'scripts/run_first_tournament.py'
+      - 'scripts/run_v013_campaign.py'
       - 'scripts/run_research_swarm.py'
       - 'scripts/init_swarm_splits.py'
       - 'scripts/plan_research_round.py'
@@ -29,6 +30,7 @@ on:
       - 'scripts/run_swarm_lab.py'
       - 'scripts/run_arena_contestant.py'
       - 'scripts/run_first_tournament.py'
+      - 'scripts/run_v013_campaign.py'
       - 'scripts/run_research_swarm.py'
       - 'scripts/init_swarm_splits.py'
       - 'scripts/plan_research_round.py'
@@ -71,6 +73,7 @@ jobs:
           scripts/run_swarm_lab.py
           scripts/run_arena_contestant.py
           scripts/run_first_tournament.py
+          scripts/run_v013_campaign.py
           scripts/run_research_swarm.py
           scripts/init_swarm_splits.py
           scripts/plan_research_round.py
@@ -87,6 +90,7 @@ jobs:
           scripts/run_swarm_lab.py
           scripts/run_arena_contestant.py
           scripts/run_first_tournament.py
+          scripts/run_v013_campaign.py
           scripts/run_research_swarm.py
           scripts/init_swarm_splits.py
           scripts/plan_research_round.py
