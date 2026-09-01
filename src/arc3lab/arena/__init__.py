@@ -12,6 +12,7 @@ from arc3lab.arena.research_packet import DEFAULT_ROLES, ResearchPacketBuilder, 
 from arc3lab.arena.schema import ArenaManifest, ArenaResult, ContestantSpec, PlannedRun
 from arc3lab.arena.scoring import AggregateScore, PromotionDecision
 from arc3lab.arena.splits import SplitRegistry
+from arc3lab.arena.workers import ExperimentWorker, WorkerPool, WorkerReceipt, WorkerSpec
 
 __all__ = [
     "AggregateScore",
@@ -20,6 +21,7 @@ __all__ = [
     "ArenaResult",
     "ContestantSpec",
     "DEFAULT_ROLES",
+    "ExperimentWorker",
     "PlannedRun",
     "PromotionDecision",
     "ProposalTournament",
@@ -31,5 +33,8 @@ __all__ = [
     "ResearchSwarm",
     "ResultLedger",
     "SplitRegistry",
+    "WorkerPool",
+    "WorkerReceipt",
+    "WorkerSpec",
     "suite_payload_to_result",
 ]
