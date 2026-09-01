@@ -16,6 +16,14 @@ from arc3lab.arena.runtime_budget import RuntimeBudgetAudit, audit_runtime_budge
 from arc3lab.arena.schema import ArenaManifest, ArenaResult, ContestantSpec, PlannedRun
 from arc3lab.arena.scoring import AggregateScore, PromotionDecision
 from arc3lab.arena.splits import SplitRegistry
+from arc3lab.arena.swarm_intelligence import (
+    ResearchReview,
+    ReviewAssignment,
+    SwarmCouncil,
+    SwarmMemory,
+    SwarmOutcome,
+    SwarmPriority,
+)
 
 __all__ = [
     "AggregateScore",
@@ -36,11 +44,17 @@ __all__ = [
     "ResearchCall",
     "ResearchPacketBuilder",
     "ResearchProposal",
+    "ResearchReview",
     "ResearchRole",
     "ResearchSwarm",
     "ResultLedger",
+    "ReviewAssignment",
     "RuntimeBudgetAudit",
     "SplitRegistry",
+    "SwarmCouncil",
+    "SwarmMemory",
+    "SwarmOutcome",
+    "SwarmPriority",
     "TournamentStage",
     "audit_runtime_budget",
     "suite_payload_to_result",
