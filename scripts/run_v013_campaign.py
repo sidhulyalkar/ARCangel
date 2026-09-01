@@ -33,6 +33,30 @@ def _run(command: list[str]) -> None:
     subprocess.run(command, check=True)
 
 
+def _tournament_command(args: argparse.Namespace, *, judge: bool) -> list[str]:
+    command = [
+        sys.executable,
+        "scripts/run_first_tournament.py",
+        "--manifest",
+        args.manifest,
+        "--root",
+        args.arena_root,
+        "--server-mode",
+        args.server_mode,
+    ]
+    if judge:
+        command.extend(
+            [
+                "--private-registry",
+                str(Path(args.arena_root) / "splits.private.json"),
+                "--judge",
+            ]
+        )
+    if args.model_path:
+        command.extend(["--model-path", args.model_path])
+    return command
+
+
 def _advance_once(args: argparse.Namespace, state: str) -> None:
     if state == "NEED_SPLITS":
         salt = args.split_salt or os.getenv("ARCANGEL_SPLIT_SALT", "")
@@ -53,38 +77,15 @@ def _advance_once(args: argparse.Namespace, state: str) -> None:
         return
 
     if state == "NEED_TOURNAMENT":
-        command = [
-            sys.executable,
-            "scripts/run_first_tournament.py",
-            "--manifest",
-            args.manifest,
-            "--root",
-            args.arena_root,
-            "--server-mode",
-            args.server_mode,
-        ]
-        if args.model_path:
-            command.extend(["--model-path", args.model_path])
-        _run(command)
+        # In campaign mode BLIND remains judge-owned, but it can run immediately after an
+        # internal promotion while the same verified Qwen server is still resident.
+        _run(_tournament_command(args, judge=True))
         return
 
     if state == "NEED_BLIND_JUDGE":
-        command = [
-            sys.executable,
-            "scripts/run_first_tournament.py",
-            "--manifest",
-            args.manifest,
-            "--root",
-            args.arena_root,
-            "--private-registry",
-            str(Path(args.arena_root) / "splits.private.json"),
-            "--server-mode",
-            args.server_mode,
-            "--judge",
-        ]
-        if args.model_path:
-            command.extend(["--model-path", args.model_path])
-        _run(command)
+        # This path supports resuming a campaign whose tournament was previously run
+        # without --judge. It launches/reuses a server only for the missing judge work.
+        _run(_tournament_command(args, judge=True))
         return
 
     if state == "NEED_PACKAGE":
