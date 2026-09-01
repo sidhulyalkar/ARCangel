@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'src/arc3lab/arena/**'
+      - 'src/arc3lab/evaluation/runner.py'
       - 'scripts/run_swarm_lab.py'
       - 'scripts/run_arena_contestant.py'
       - 'scripts/run_research_swarm.py'
@@ -23,6 +24,7 @@ on:
   pull_request:
     paths:
       - 'src/arc3lab/arena/**'
+      - 'src/arc3lab/evaluation/runner.py'
       - 'scripts/run_swarm_lab.py'
       - 'scripts/run_arena_contestant.py'
       - 'scripts/run_research_swarm.py'
@@ -55,10 +57,11 @@ jobs:
       - run: python -m pip install -e '.[dev]'
       - run: python scripts/run_swarm_lab.py validate
       - run: python scripts/run_research_swarm.py --providers configs/research-providers.example.json --plan-only
-      - run: python -m pytest -q tests/test_v013_swarm_arena.py tests/test_v013_workers.py tests/test_v013_packaging.py
+      - run: python -m pytest -q tests/test_v013_*.py
       - run: >-
           python -m ruff check
           src/arc3lab/arena
+          src/arc3lab/evaluation/runner.py
           scripts/run_swarm_lab.py
           scripts/run_arena_contestant.py
           scripts/run_research_swarm.py
@@ -69,12 +72,11 @@ jobs:
           scripts/build_v013_candidate_notebook.py
           scripts/verify_v013_candidate_notebook.py
           scripts/package_kaggle_ready.py
-          tests/test_v013_swarm_arena.py
-          tests/test_v013_workers.py
-          tests/test_v013_packaging.py
+          tests/test_v013_*.py
       - run: >-
           python -m compileall -q
           src/arc3lab/arena
+          src/arc3lab/evaluation/runner.py
           scripts/run_swarm_lab.py
           scripts/run_arena_contestant.py
           scripts/run_research_swarm.py
@@ -85,3 +87,15 @@ jobs:
           scripts/build_v013_candidate_notebook.py
           scripts/verify_v013_candidate_notebook.py
           scripts/package_kaggle_ready.py
+      - run: >-
+          python scripts/build_v013_candidate_notebook.py
+          --profile v012-lite
+          --contestant-id E-v012-lite
+          --build-id CI-V013-E
+          --output /tmp/arcangel-v013-e.ipynb
+      - run: >-
+          python scripts/verify_v013_candidate_notebook.py
+          /tmp/arcangel-v013-e.ipynb
+          --profile v012-lite
+          --contestant-id E-v012-lite
+          --build-id CI-V013-E
