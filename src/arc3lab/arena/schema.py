@@ -15,6 +15,7 @@ class ContestantSpec:
     role: str
     description: str = ""
     command: tuple[str, ...] = ()
+    judge_command: tuple[str, ...] = ()
     parent: str | None = None
     control_id: str | None = None
     tags: tuple[str, ...] = ()
@@ -26,14 +27,16 @@ class ContestantSpec:
         if not contestant_id:
             raise ValueError("contestant id cannot be empty")
         command = data.get("command", ())
-        if isinstance(command, str):
-            raise TypeError("contestant command must be a list of argv tokens, not a shell string")
+        judge_command = data.get("judge_command", ())
+        if isinstance(command, str) or isinstance(judge_command, str):
+            raise TypeError("contestant commands must be argv lists, not shell strings")
         return cls(
             contestant_id=contestant_id,
             family=str(data.get("family", contestant_id)),
             role=str(data.get("role", "researcher")),
             description=str(data.get("description", "")),
             command=tuple(str(token) for token in command),
+            judge_command=tuple(str(token) for token in judge_command),
             parent=data.get("parent"),
             control_id=data.get("control_id"),
             tags=tuple(str(tag) for tag in data.get("tags", ())),
@@ -45,9 +48,11 @@ class ContestantSpec:
 class PromotionRules:
     min_validation_delta: float = 0.02
     min_dev_delta: float = -0.01
+    min_blind_delta: float = -0.01
     max_emergency_fraction: float = 0.02
     max_failure_rate: float = 0.05
     min_validation_runs: int = 2
+    min_blind_runs: int = 2
     require_control: bool = True
 
     @classmethod
