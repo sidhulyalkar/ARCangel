@@ -11,6 +11,7 @@ on:
       - 'scripts/run_v013_campaign.py'
       - 'scripts/run_research_swarm.py'
       - 'scripts/run_swarm_council.py'
+      - 'scripts/run_swarm_research_cycle.py'
       - 'scripts/record_swarm_outcome.py'
       - 'scripts/init_swarm_splits.py'
       - 'scripts/plan_research_round.py'
@@ -21,7 +22,7 @@ on:
       - 'scripts/package_kaggle_ready.py'
       - 'configs/swarm-v013.json'
       - 'configs/swarm-packet-files.txt'
-      - 'configs/research-providers.example.json'
+      - 'configs/research-providers*.json'
       - 'configs/experiment-workers.example.json'
       - 'tests/test_v013_*.py'
       - '.github/workflows/swarm-ci.yml'
@@ -35,6 +36,7 @@ on:
       - 'scripts/run_v013_campaign.py'
       - 'scripts/run_research_swarm.py'
       - 'scripts/run_swarm_council.py'
+      - 'scripts/run_swarm_research_cycle.py'
       - 'scripts/record_swarm_outcome.py'
       - 'scripts/init_swarm_splits.py'
       - 'scripts/plan_research_round.py'
@@ -45,7 +47,7 @@ on:
       - 'scripts/package_kaggle_ready.py'
       - 'configs/swarm-v013.json'
       - 'configs/swarm-packet-files.txt'
-      - 'configs/research-providers.example.json'
+      - 'configs/research-providers*.json'
       - 'configs/experiment-workers.example.json'
       - 'tests/test_v013_*.py'
       - '.github/workflows/swarm-ci.yml'
@@ -80,6 +82,7 @@ jobs:
           scripts/run_v013_campaign.py
           scripts/run_research_swarm.py
           scripts/run_swarm_council.py
+          scripts/run_swarm_research_cycle.py
           scripts/record_swarm_outcome.py
           scripts/init_swarm_splits.py
           scripts/plan_research_round.py
@@ -99,6 +102,7 @@ jobs:
           scripts/run_v013_campaign.py
           scripts/run_research_swarm.py
           scripts/run_swarm_council.py
+          scripts/run_swarm_research_cycle.py
           scripts/record_swarm_outcome.py
           scripts/init_swarm_splits.py
           scripts/plan_research_round.py
