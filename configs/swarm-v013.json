@@ -6,6 +6,10 @@
   "split_salt": "set-with-ARCANGEL_SPLIT_SALT-not-public-default",
   "leaderboard_control_id": "A-duck-qwen38-public",
   "min_leaderboard_delta": 0.0,
+  "min_leaderboard_candidate_runs": 2,
+  "min_leaderboard_control_runs": 2,
+  "leaderboard_confidence_se": 1.0,
+  "require_leaderboard_artifact_hash": true,
   "weights": {
     "solve_rate": 0.30,
     "level_rate": 0.19,
