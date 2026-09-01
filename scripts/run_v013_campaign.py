@@ -113,7 +113,7 @@ def main() -> int:
     ap.add_argument("--server-mode", choices=["launch", "reuse"], default="launch")
     ap.add_argument("--split-salt", default="")
     ap.add_argument("--advance", action="store_true")
-    ap.add_argument("--max-auto-transitions", type=int, default=4)
+    ap.add_argument("--max-auto-transitions", type=int, default=8)
     ap.add_argument(
         "--status-output",
         default="artifacts/arena/v013/campaign-status.json",
@@ -135,8 +135,11 @@ def main() -> int:
         _advance_once(args, decision.state)
 
     final = _director(args).decide()
-    print("V013 CAMPAIGN STOPPED AT AUTO-TRANSITION LIMIT:", json.dumps(final.to_dict(), indent=2))
-    return 3
+    print(
+        "V013 CAMPAIGN STOPPED AT AUTO-TRANSITION LIMIT:",
+        json.dumps(final.to_dict(), indent=2),
+    )
+    return 0 if final.state not in AUTO_STATES else 3
 
 
 if __name__ == "__main__":
