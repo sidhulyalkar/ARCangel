@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -23,9 +24,9 @@ class CampaignDecision:
 class CampaignDirector:
     """Resolve the next V013 action from evidence already present on disk.
 
-    The campaign deliberately stops at the external Kaggle boundary. It may prepare an
-    exact candidate artifact and tell the operator which hash needs another scored run,
-    but it never invents a leaderboard observation or silently changes notebook bytes.
+    The campaign deliberately stops at external evidence boundaries. It may route a failed
+    architecture tournament into the development swarm or prepare an exact candidate artifact,
+    but it never invents research-provider outputs, BLIND success, or leaderboard observations.
     """
 
     def __init__(
@@ -83,6 +84,61 @@ class CampaignDirector:
                 return group
         return None
 
+    def _next_swarm_generation(self) -> int:
+        highest = 0
+        pattern = re.compile(r"swarm-cycle-generation-(\d+)\.json$")
+        for path in self.root.glob("swarm-cycle-generation-*.json"):
+            match = pattern.search(path.name)
+            if match:
+                highest = max(highest, int(match.group(1)))
+        return highest + 1
+
+    def _swarm_decision(self, reason: str, *, falsifier: str) -> CampaignDecision:
+        generation = self._next_swarm_generation()
+        return CampaignDecision(
+            state="NEED_SWARM_RESEARCH",
+            reason=reason,
+            action=(
+                "run one heterogeneous hypothesis-space swarm generation, implement selected "
+                "experiments in isolated branches, and measure them against their declared controls"
+            ),
+            details={
+                "generation": generation,
+                "providers": "configs/research-providers.nvidia-swarm.json",
+                "command": (
+                    "python scripts/run_swarm_research_cycle.py "
+                    "--providers configs/research-providers.nvidia-swarm.json "
+                    f"--generation {generation}"
+                ),
+                "falsifier": falsifier,
+                "authority": "swarm proposes and prioritizes; paired arena evidence updates fitness",
+            },
+        )
+
+    def _blind_incomplete(self, promoted: list[str]) -> list[dict[str, Any]]:
+        counts: dict[str, int] = {}
+        for row in self.lab.ledger.read():
+            if row.split == "blind":
+                counts[row.contestant_id] = counts.get(row.contestant_id, 0) + 1
+        required = self.lab.manifest.promotion.min_blind_runs
+        missing: list[dict[str, Any]] = []
+        for contestant_id in promoted:
+            contestant = self.lab._contestant(contestant_id)
+            control_id = contestant.control_id
+            candidate_runs = counts.get(contestant_id, 0)
+            control_runs = counts.get(control_id, 0) if control_id else 0
+            if candidate_runs < required or (control_id and control_runs < required):
+                missing.append(
+                    {
+                        "contestant_id": contestant_id,
+                        "candidate_blind_runs": candidate_runs,
+                        "control_id": control_id,
+                        "control_blind_runs": control_runs,
+                        "required_runs": required,
+                    }
+                )
+        return missing
+
     def decide(self) -> CampaignDecision:
         manifest = self.lab.manifest
         if not self.public_registry.exists() or not self.private_registry.exists():
@@ -108,20 +164,26 @@ class CampaignDirector:
 
         promoted = self.lab.promotion_queue()
         if not promoted:
-            return CampaignDecision(
-                state="NO_CHALLENGER_SURVIVED",
-                reason="the current B/C/D/E tournament produced no internally promoted challenger",
-                action="generate a failure packet and start the next architecture research round",
-                details={"tournament_status": tournament.status()},
+            return self._swarm_decision(
+                "the controlled B/C/D/E tournament produced no internally promoted challenger",
+                falsifier="the current architecture family failed repeatable DEV/VALIDATION promotion",
             )
 
         kaggle_ready = self.lab.kaggle_ready_queue()
         if not kaggle_ready:
-            return CampaignDecision(
-                state="NEED_BLIND_JUDGE",
-                reason="an internal challenger survived but has not passed the private BLIND gate",
-                action="run the promoted challenger and its control on the private BLIND split",
-                details={"promoted": promoted},
+            missing_blind = self._blind_incomplete(promoted)
+            if missing_blind:
+                return CampaignDecision(
+                    state="NEED_BLIND_JUDGE",
+                    reason="an internal challenger survived but lacks complete private BLIND evidence",
+                    action="run promoted challengers and their controls on the private BLIND split",
+                    details={"promoted": promoted, "missing_blind": missing_blind},
+                )
+            # Private values remain judge-owned. Researchers learn only that the gate rejected the
+            # lineage, not which private games or mechanics caused the rejection.
+            return self._swarm_decision(
+                "all internally promoted challengers have complete BLIND evidence but none passed the gate",
+                falsifier="private BLIND judge rejected the current promoted lineage",
             )
 
         packages = self._package_by_contestant()
