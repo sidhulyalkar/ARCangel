@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from math import sqrt
 from statistics import mean, pstdev
 from typing import Iterable
@@ -42,7 +42,10 @@ class LeaderboardComparison:
     reasons: tuple[str, ...]
 
     def to_dict(self) -> dict[str, object]:
-        return asdict(self)
+        payload = asdict(self)
+        # Compatibility alias retained for older arena receipts and notebooks.
+        payload["kaggle_delta"] = self.mean_delta
+        return payload
 
 
 def artifact_evidence(
