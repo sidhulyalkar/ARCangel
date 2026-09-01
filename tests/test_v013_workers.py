@@ -92,7 +92,7 @@ def test_experiment_worker_commits_only_after_qualification(tmp_path: Path) -> N
     assert saved["commit_sha"] == receipt.commit_sha
 
 
-def test_failed_qualification_does_not_commit_candidate(tmp_path: Path) -> None:
+def test_failed_qualification_cleans_branch_for_safe_retry(tmp_path: Path) -> None:
     repo = initialized_repo(tmp_path)
     spec = WorkerSpec(
         worker_id="test-worker",
@@ -120,9 +120,14 @@ def test_failed_qualification_does_not_commit_candidate(tmp_path: Path) -> None:
     )
     assert receipt.status == "qualification_failed"
     assert not receipt.qualification_passed
-    base_head = run_git(repo, "rev-parse", "HEAD").stdout.strip()
-    branch_head = run_git(repo, "rev-parse", "experiment/r1-02-bad").stdout.strip()
-    assert branch_head == base_head
+    # Failed branches are intentionally deleted after their receipt is written so the
+    # exact proposal can be retried without a stale ref blocking worktree creation.
+    assert run_git(repo, "branch", "--list", "experiment/r1-02-bad").stdout.strip() == ""
+    assert not (tmp_path / "worktrees" / "R1-02-bad__test-worker").exists()
+    saved = json.loads(
+        (tmp_path / "receipts" / "R1-02-bad__test-worker.json").read_text()
+    )
+    assert saved["status"] == "qualification_failed"
 
 
 def test_worker_pool_assigns_roles_without_executing(tmp_path: Path) -> None:
