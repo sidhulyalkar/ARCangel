@@ -36,6 +36,8 @@ class ProposalTournament:
                     falsifier=str(data.get("falsifier", "")),
                     implementation=str(data.get("implementation", "")),
                     failure_mode=str(data.get("failure_mode", "")),
+                    target_profile=str(data.get("target_profile", "v012")),
+                    control_profile=str(data.get("control_profile", "coding-minimal")),
                     raw_text=str(data.get("raw_text", "")),
                     valid=bool(data.get("valid", False)),
                 )
@@ -91,6 +93,8 @@ class ProposalTournament:
                     "falsifier": proposal.falsifier,
                     "implementation": proposal.implementation,
                     "failure_mode": proposal.failure_mode,
+                    "target_profile": proposal.target_profile,
+                    "control_profile": proposal.control_profile,
                     "suggested_branch": f"experiment/{_slug(key)}",
                 }
             )
