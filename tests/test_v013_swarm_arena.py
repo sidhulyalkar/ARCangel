@@ -4,12 +4,13 @@ import json
 import tarfile
 from pathlib import Path
 
+from arc3lab.arena.evolution import ProposalTournament
 from arc3lab.arena.metrics import suite_payload_to_result
 from arc3lab.arena.orchestrator import ArenaOrchestrator
 from arc3lab.arena.research_agents import ProviderSpec, ResearchProposal, ResearchSwarm
 from arc3lab.arena.research_packet import ResearchPacketBuilder
 from arc3lab.arena.schema import ArenaManifest, ArenaResult
-from arc3lab.arena.scoring import aggregate_results, promotion_decision
+from arc3lab.arena.scoring import aggregate_results, promotion_decision, score_result
 from arc3lab.arena.splits import SplitRegistry
 
 
@@ -76,6 +77,27 @@ def kaggle_result(cid: str, seed: int, score: float) -> ArenaResult:
         split="kaggle",
         seed=seed,
         metrics={"official_score": score},
+    )
+
+
+def proposal(
+    provider: str,
+    role: str,
+    hypothesis: str,
+    *,
+    split: str = "validation",
+) -> ResearchProposal:
+    return ResearchProposal(
+        provider_id=provider,
+        role_id=role,
+        hypothesis=hypothesis,
+        experiment="run ablation",
+        target_metric="solve_rate",
+        split=split,
+        falsifier="no held-out improvement",
+        implementation="small isolated patch",
+        failure_mode="overfit",
+        valid=True,
     )
 
 
@@ -166,6 +188,13 @@ def test_split_registry_is_deterministic_and_hides_blind_ids() -> None:
     assert public["blind_count"] == len(one.blind)
 
 
+def test_split_registry_keeps_all_three_splits_nonempty_for_three_games() -> None:
+    registry = SplitRegistry.build(["a", "b", "c"], salt="secret")
+    assert len(registry.dev) == 1
+    assert len(registry.validation) == 1
+    assert len(registry.blind) == 1
+
+
 def test_research_packet_is_deterministic_and_excludes_blind(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -231,6 +260,56 @@ def test_research_swarm_plans_provider_role_cross_product() -> None:
     ]
 
 
+def test_proposal_tournament_rejects_blind_and_kaggle_requests() -> None:
+    tournament = ProposalTournament(
+        [
+            proposal("a", "scientist", "good", split="validation"),
+            proposal("b", "planner", "leak", split="blind"),
+            proposal("c", "vision", "leaderboard chase", split="kaggle"),
+        ]
+    )
+    assert [row.hypothesis for row in tournament.eligible()] == ["good"]
+
+
+def test_proposal_tournament_deduplicates_and_preserves_role_diversity() -> None:
+    tournament = ProposalTournament(
+        [
+            proposal("a", "scientist", "Selective exact memory helps"),
+            proposal("b", "scientist", " selective   exact memory HELPS "),
+            proposal("c", "planner", "Compile plans after model validation"),
+            proposal("d", "vision", "Choose representation adaptively"),
+        ]
+    )
+    selected = tournament.select(max_proposals=3)
+    assert len(selected) == 3
+    assert len({row.role_id for row in selected}) == 3
+    assert sum("memory" in row.hypothesis.lower() for row in selected) == 1
+
+
+def test_exchange_brief_is_only_measured_public_evidence() -> None:
+    tournament = ProposalTournament([proposal("a", "scientist", "test memory")])
+    brief = tournament.exchange_brief(
+        {
+            "rankings": {
+                "validation": [
+                    {"contestant_id": "D-v012", "robust_score": 0.5, "mean_score": 0.52}
+                ]
+            },
+            "promotion_decisions": [
+                {
+                    "contestant_id": "E-v012-lite",
+                    "promoted": False,
+                    "reasons": ["validation delta too small"],
+                }
+            ],
+        }
+    )
+    assert "D-v012" in brief
+    assert "validation delta too small" in brief
+    assert "test memory" in brief
+    assert "blind" not in brief.lower()
+
+
 def test_suite_metrics_capture_efficiency_and_scientific_health() -> None:
     payload = {
         "elapsed_seconds": 12,
@@ -272,6 +351,44 @@ def test_suite_metrics_capture_efficiency_and_scientific_health() -> None:
     assert converted.metrics["prediction_accuracy"] == 0.9
     assert converted.metrics["falsification_health"] == 0.75
     assert 0 < converted.metrics["action_efficiency"] < 1
+
+
+def test_partial_game_failure_is_penalized_without_destroying_run_information(
+    tmp_path: Path,
+) -> None:
+    manifest = ArenaManifest.load(manifest_file(tmp_path))
+    payload = {
+        "games": [
+            {
+                "game_id": "good",
+                "state": "WIN",
+                "levels_completed": 1,
+                "actions": 20,
+                "model_calls": 5,
+                "error": None,
+                "deadline_exhausted": False,
+            },
+            {
+                "game_id": "bad",
+                "state": "ERROR",
+                "levels_completed": 0,
+                "actions": 0,
+                "model_calls": 0,
+                "error": "boom",
+                "deadline_exhausted": False,
+            },
+        ],
+        "diagnostics": {},
+    }
+    converted = suite_payload_to_result(
+        payload,
+        contestant_id="challenger",
+        split="dev",
+        seed=1,
+    )
+    assert converted.status == "ok"
+    assert converted.metrics["failure_rate"] == 0.5
+    assert score_result(converted, manifest.weights) > -1.0
 
 
 def test_plan_expands_tokens_and_skips_existing_runs(tmp_path: Path) -> None:
