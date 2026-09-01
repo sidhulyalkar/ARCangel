@@ -207,10 +207,18 @@ def main() -> None:
             raise RuntimeError("candidate had model transport failures; inspect receipt and vLLM log")
         if int(diagnostics.get("errors", 0)) != 0:
             raise RuntimeError("candidate had environment/runner errors; inspect receipt")
-        skipped = int(diagnostics.get("deadline_exhausted_games", 0))
-        if skipped:
+        skipped = int(diagnostics.get("skipped_deadline_games", 0))
+        global_exhausted = int(diagnostics.get("global_deadline_exhausted_games", 0))
+        if skipped or global_exhausted:
             raise RuntimeError(
-                f"coverage gate failed: {skipped} games exhausted a deadline; inspect runtime budget"
+                "coverage gate failed: shared deadline starved one or more games; "
+                f"skipped={skipped} global_exhausted={global_exhausted}"
+            )
+        capped = int(diagnostics.get("game_budget_exhausted_games", 0))
+        if capped:
+            print(
+                f"COVERAGE-SAFE GAME CAPS USED: {capped} games yielded to the suite budget",
+                flush=True,
             )
         print(f"V013 CANDIDATE CAMPAIGN PASS: {args.build_id}", flush=True)
     finally:
