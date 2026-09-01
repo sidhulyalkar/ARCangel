@@ -1,0 +1,16 @@
+README.md
+docs/V012_EVIDENCE_FIRST_CODING_AGENT.md
+docs/SWARM_RESEARCH_PROGRAM.md
+artifacts/experiments/S190A_017_POSTMORTEM.md
+artifacts/experiments/S200_DUCK_QWEN38_CONTROL.md
+configs/swarm-v013.json
+src/arc3lab/arena/schema.py
+src/arc3lab/arena/scoring.py
+src/arc3lab/arena/orchestrator.py
+src/arc3lab/arena/metrics.py
+src/arc3lab/arena/research_packet.py
+src/arc3lab/policy/evidence_first.py
+src/arc3lab/policy/evidence_workspace.py
+src/arc3lab/policy/evidence_prompt.py
+src/arc3lab/policy/coding.py
+src/arc3lab/policy/lean_scientist.py
