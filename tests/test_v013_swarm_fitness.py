@@ -31,7 +31,7 @@ def manifest(tmp_path: Path) -> ArenaManifest:
                         "id": "control",
                         "family": "coding",
                         "role": "control",
-                        "enabled": false,
+                        "enabled": False,
                     }
                 ],
             }
