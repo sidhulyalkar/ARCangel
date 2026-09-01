@@ -63,6 +63,12 @@ and leaderboard performance are separate gates.
     @staticmethod
     def _safe_scorecard(scorecard: dict[str, object]) -> dict[str, object]:
         safe = sanitize_research_payload(json.loads(json.dumps(scorecard)))
+        scope = safe.get("evidence_scope")
+        if scope != ["dev", "validation"]:
+            # A caller may accidentally pass the judge/campaign scorecard. Dynamic private and
+            # leaderboard fields are stripped recursively, but its total result_count could still
+            # reveal that non-development observations exist. Remove ambiguous aggregate counts.
+            safe.pop("result_count", None)
         assert_research_payload_safe(safe)
         return safe
 
