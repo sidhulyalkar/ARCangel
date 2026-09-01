@@ -17,6 +17,9 @@ from arc3lab.arena.swarm_intelligence import (
 )
 
 
+RUNNABLE_PROFILES = ("coding-minimal", "v011", "v012", "v012-lite")
+
+
 @dataclass(frozen=True, slots=True)
 class ProviderSpec:
     provider_id: str
@@ -64,6 +67,8 @@ class ResearchProposal:
     falsifier: str
     implementation: str
     failure_mode: str
+    target_profile: str = "v012"
+    control_profile: str = "coding-minimal"
     raw_text: str = ""
     valid: bool = True
 
@@ -96,8 +101,18 @@ class ResearchProposal:
             falsifier=str(payload.get("falsifier", "")),
             implementation=str(payload.get("implementation", "")),
             failure_mode=str(payload.get("failure_mode", "")),
+            target_profile=str(payload.get("target_profile", "")).strip(),
+            control_profile=str(payload.get("control_profile", "")).strip(),
             raw_text=text,
             valid=valid,
+        )
+
+    @property
+    def executable_contract_valid(self) -> bool:
+        return (
+            self.target_profile in RUNNABLE_PROFILES
+            and self.control_profile in RUNNABLE_PROFILES
+            and self.target_profile != "v011"
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -111,6 +126,9 @@ class ResearchProposal:
             "falsifier": self.falsifier,
             "implementation": self.implementation,
             "failure_mode": self.failure_mode,
+            "target_profile": self.target_profile,
+            "control_profile": self.control_profile,
+            "executable_contract_valid": self.executable_contract_valid,
             "valid": self.valid,
             "raw_text": self.raw_text,
         }
@@ -169,6 +187,8 @@ class ResearchSwarm:
             falsifier="",
             implementation="",
             failure_mode="",
+            target_profile="",
+            control_profile="",
             raw_text=reason,
             valid=False,
         )
@@ -216,8 +236,12 @@ class ResearchSwarm:
         system = ResearchPacketBuilder.role_prompt(role, experiment_id)
         user = (
             "Study the blind-safe research context below. Return exactly one JSON object with keys "
-            "hypothesis, experiment, target_metric, split, falsifier, implementation, failure_mode. "
-            "Use DEV for invention and VALIDATION for selection; never request blind identities.\n\n"
+            "hypothesis, experiment, target_metric, split, falsifier, implementation, failure_mode, "
+            "target_profile, control_profile. target_profile and control_profile must each be one of "
+            f"{list(RUNNABLE_PROFILES)}. Do not use v011 as a target_profile because it is retained "
+            "only as a historical negative control. Name the smallest executable profile whose code "
+            "your patch changes, and the exact runnable profile it must beat. Use DEV for invention "
+            "and VALIDATION for selection; never request blind identities.\n\n"
         )
         if guidance:
             user += guidance + "\n\n"
@@ -254,7 +278,8 @@ No review can promote code. Measured DEV/VALIDATION results remain authoritative
             "Review the anonymous proposal below against the blind-safe context. Return exactly one JSON object "
             "with numeric scores in [0,1] for falsifiability, generalization, information_gain, feasibility, "
             "redundancy, persuasion_risk, confidence; verdict must be advance, test_disagreement, or reject; "
-            "also provide strongest_objection and decisive_test. Do not request BLIND or Kaggle evidence.\n\n"
+            "also provide strongest_objection and decisive_test. Check that target_profile/control_profile form "
+            "a fair executable comparison. Do not request BLIND or Kaggle evidence.\n\n"
             "# ANONYMOUS PROPOSAL\n"
             + json.dumps(proposal_payload, indent=2)
             + "\n\n# RESEARCH CONTEXT\n"
