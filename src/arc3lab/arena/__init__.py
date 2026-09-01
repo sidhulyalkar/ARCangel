@@ -1,4 +1,5 @@
 from arc3lab.arena.evolution import ProposalTournament
+from arc3lab.arena.first_tournament import FirstTournamentDirector, TournamentStage
 from arc3lab.arena.leaderboard import ArtifactEvidence, LeaderboardComparison
 from arc3lab.arena.ledger import ResultLedger
 from arc3lab.arena.metrics import suite_payload_to_result
@@ -23,6 +24,7 @@ __all__ = [
     "ArtifactEvidence",
     "ContestantSpec",
     "DEFAULT_ROLES",
+    "FirstTournamentDirector",
     "LeaderboardComparison",
     "PlannedRun",
     "PromotionDecision",
@@ -36,6 +38,7 @@ __all__ = [
     "ResultLedger",
     "RuntimeBudgetAudit",
     "SplitRegistry",
+    "TournamentStage",
     "audit_runtime_budget",
     "suite_payload_to_result",
 ]
