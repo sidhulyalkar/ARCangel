@@ -11,6 +11,7 @@ import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PUBLIC_RESEARCH_SPLIT_SALT = "arcangel-v013-public-research-split-v1"
 
 
 def _add_file(tf: tarfile.TarFile, path: Path, arcname: str) -> None:
@@ -139,7 +140,7 @@ arc = Arcade()
 game_ids = sorted(str(item.game_id) for item in arc.get_environments())
 if len(game_ids) < 3:
     raise RuntimeError("Too few public environments for research split")
-research_salt = "v013-tournament-{source_sha[:24]}"
+research_salt = "{PUBLIC_RESEARCH_SPLIT_SALT}"
 registry = SplitRegistry.build(game_ids, salt=research_salt, dev_fraction=0.60, validation_fraction=0.20)
 root = pathlib.Path("artifacts/arena/v013")
 root.mkdir(parents=True, exist_ok=True)
@@ -149,10 +150,11 @@ private = root / "splits.private.json"
 if private.exists():
     raise RuntimeError("Research-only notebook must not materialize private BLIND identities")
 print("PUBLIC RESEARCH SPLIT:", json.dumps({{
+    "split_version": "v1",
     "game_count": len(game_ids),
     "dev_count": len(registry.dev),
     "validation_count": len(registry.validation),
-    "withheld_blind_count": len(registry.blind),
+    "reserved_research_holdout_count": len(registry.blind),
     "private_blind_materialized": False,
 }}, sort_keys=True))
 '''
@@ -183,6 +185,7 @@ if (root / "splits.private.json").exists():
 summary = {{
     "build_id": "{build_id}",
     "embedded_source_sha256": "{source_sha}",
+    "public_research_split_version": "v1",
     "status": json.loads(status.read_text(encoding="utf-8")),
     "scorecard_sha256": hashlib.sha256(scorecard.read_bytes()).hexdigest(),
     "private_blind_materialized": False,
@@ -202,10 +205,11 @@ print(json.dumps(summary, indent=2))
         "cells": [
             _markdown(
                 f"# ARCangel V013 Research Tournament | {build_id}\n\n"
-                "Research-only adaptive B/C/D/E architecture tournament. It creates a deterministic "
-                "public DEV/VALIDATION split, withholds BLIND identities, runs one shared Qwen3.8 27B "
-                "FP8 server, and exports scorecard/status artifacts. **It does not create a Kaggle "
-                "submission.**\n\n"
+                "Research-only adaptive B/C/D/E architecture tournament. It uses a stable versioned "
+                "public DEV/VALIDATION split across code revisions, reserves a research-only holdout, "
+                "runs one shared Qwen3.8 27B FP8 server, and exports scorecard/status artifacts. The "
+                "true private BLIND registry is separate and is not materialized here. **This notebook "
+                "does not create a Kaggle submission.**\n\n"
                 "Kaggle settings: RTX PRO 6000, Internet OFF. Attach ARC Prize 2026, ARC3 vLLM H100 "
                 "Wheelhouse V3, and Qwen3.8 27B FP8 Repacked."
             ),
