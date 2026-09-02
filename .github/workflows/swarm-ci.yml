@@ -210,3 +210,93 @@ jobs:
           python scripts/verify_v013_tournament_notebook.py
           /tmp/arcangel-v013-tournament.ipynb
           --build-id CI-V013-TOURNAMENT
+
+  publish-tournament-notebook:
+    needs: swarm-contract
+    runs-on: ubuntu-latest
+    env:
+      BUILD_ID: V013-TRUTH-PHASE-BCDE-20260902
+      SOURCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[dev]'
+      - name: Requalify exact source head
+        run: |
+          python scripts/run_swarm_lab.py validate
+          python scripts/verify_swarm_research_workflow.py
+          python -m pytest -q tests/test_v013_*.py
+          python -m ruff check \
+            src/arc3lab/arena \
+            src/arc3lab/evaluation/runner.py \
+            scripts/route_swarm_experiments.py \
+            scripts/run_swarm_measurement_gpu_stage.py \
+            scripts/retrying_llm_patch_worker.py \
+            scripts/build_v013_tournament_notebook.py \
+            scripts/verify_v013_tournament_notebook.py \
+            tests/test_v013_*.py
+      - name: Build exact research tournament notebook
+        run: >-
+          python scripts/build_v013_tournament_notebook.py
+          --build-id "$BUILD_ID"
+          --output /tmp/ARCangel_V013_Research_Tournament_Qwen38.ipynb
+      - name: Verify exact research tournament notebook
+        run: >-
+          python scripts/verify_v013_tournament_notebook.py
+          /tmp/ARCangel_V013_Research_Tournament_Qwen38.ipynb
+          --build-id "$BUILD_ID"
+      - name: Write immutable notebook receipt
+        run: |
+          python - <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          notebook = Path('/tmp/ARCangel_V013_Research_Tournament_Qwen38.ipynb')
+          payload = json.loads(notebook.read_text(encoding='utf-8'))
+          bootstrap = ''.join(payload['cells'][1]['source'])
+          match = re.search(r'EMBEDDED_SOURCE_SHA256 = "([0-9a-f]{64})"', bootstrap)
+          if not match:
+              raise SystemExit('embedded source SHA missing from tournament notebook')
+          bundle_match = re.search(r'BUNDLE = "([^"]+)"', bootstrap)
+          if not bundle_match:
+              raise SystemExit('embedded source bundle missing from tournament notebook')
+          bundle = base64.b64decode(bundle_match.group(1))
+          if hashlib.sha256(bundle).hexdigest() != match.group(1):
+              raise SystemExit('embedded source bundle hash mismatch')
+          receipt = {
+              'format': 'arcangel-v013-research-tournament-notebook-v1',
+              'build_id': os.environ['BUILD_ID'],
+              'source_head': os.environ['SOURCE_HEAD'],
+              'checkout_head': os.popen('git rev-parse HEAD').read().strip(),
+              'notebook_sha256': hashlib.sha256(notebook.read_bytes()).hexdigest(),
+              'embedded_source_sha256': match.group(1),
+              'public_research_split_version': 'arcangel-v013-public-research-split-v1',
+              'private_blind_materialized': False,
+              'creates_submission': False,
+              'qualification': 'tests+targeted-ruff+notebook-verifier-pass',
+              'authority': 'research-only B/C/D/E truth phase; no private BLIND and no Kaggle submission',
+          }
+          if receipt['source_head'] != receipt['checkout_head']:
+              raise SystemExit('published notebook checkout is not the declared exact source head')
+          Path('/tmp/ARCangel_V013_Research_Tournament_Receipt.json').write_text(
+              json.dumps(receipt, indent=2) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(receipt, indent=2))
+          PY
+      - name: Upload verified tournament notebook
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcangel-v013-research-tournament-notebook
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            /tmp/ARCangel_V013_Research_Tournament_Qwen38.ipynb
+            /tmp/ARCangel_V013_Research_Tournament_Receipt.json
