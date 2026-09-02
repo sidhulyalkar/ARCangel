@@ -12,7 +12,7 @@ on:
         default: '1'
         type: string
       max_proposals:
-        description: 'Maximum council-selected coding experiments'
+        description: 'Maximum council-selected experiments'
         required: true
         default: '4'
         type: string
@@ -163,24 +163,33 @@ jobs:
           --min-reviews 2
           --max-workers 6
 
-      - name: Implement council-selected cognition patches
+      - name: Route measurement and mutation experiments
+        id: routing
+        run: >-
+          python scripts/route_swarm_experiments.py
+          --battle-plan 'artifacts/arena/v013/swarm-battle-generation-${{ steps.params.outputs.generation }}.json'
+          --routed-output 'artifacts/arena/v013/swarm-battle-routed-generation-${{ steps.params.outputs.generation }}.json'
+          --evaluation-output 'artifacts/arena/v013/evaluation-plan-generation-${{ steps.params.outputs.generation }}.json'
+          --mutation-output 'artifacts/arena/v013/mutation-plan-generation-${{ steps.params.outputs.generation }}.json'
+
+      - name: Implement mutation-lane cognition patches
         id: workers
         continue-on-error: true
         run: >-
           python scripts/run_experiment_workers.py
           --workers configs/experiment-workers.nvidia.json
-          --battle-plan 'artifacts/arena/v013/swarm-battle-generation-${{ steps.params.outputs.generation }}.json'
+          --battle-plan 'artifacts/arena/v013/mutation-plan-generation-${{ steps.params.outputs.generation }}.json'
           --repo-root .
           --worktree-root ../arcangel-experiment-worktrees
           --receipt-root artifacts/arena/v013/worker-receipts
           --base-ref '${{ github.sha }}'
 
-      - name: Export cognition-only worker patches
+      - name: Export cognition-only mutation patches
         id: patches
         continue-on-error: true
         run: >-
           python scripts/export_swarm_worker_patches.py
-          --battle-plan 'artifacts/arena/v013/swarm-battle-generation-${{ steps.params.outputs.generation }}.json'
+          --battle-plan 'artifacts/arena/v013/mutation-plan-generation-${{ steps.params.outputs.generation }}.json'
           --base-sha '${{ github.sha }}'
           --repo-root .
           --worktree-root ../arcangel-experiment-worktrees
@@ -212,13 +221,16 @@ jobs:
             artifacts/arena/v013/proposals/generation-${{ steps.params.outputs.generation }}/
             artifacts/arena/v013/reviews/generation-${{ steps.params.outputs.generation }}/
             artifacts/arena/v013/swarm-battle-generation-${{ steps.params.outputs.generation }}.json
+            artifacts/arena/v013/swarm-battle-routed-generation-${{ steps.params.outputs.generation }}.json
+            artifacts/arena/v013/evaluation-plan-generation-${{ steps.params.outputs.generation }}.json
+            artifacts/arena/v013/mutation-plan-generation-${{ steps.params.outputs.generation }}.json
             artifacts/arena/v013/swarm-cycle-generation-${{ steps.params.outputs.generation }}.json
             artifacts/arena/v013/worker-receipts/
             artifacts/arena/v013/portable-patches/generation-${{ steps.params.outputs.generation }}/
             artifacts/arena/v013/swarm-context-generation-${{ steps.params.outputs.generation }}.tar.gz
             artifacts/arena/v013/swarm-context-generation-${{ steps.params.outputs.generation }}.json
 
-      - name: Qualify portable handoff
+      - name: Qualify research handoff
         if: always()
         env:
           GENERATION: ${{ steps.params.outputs.generation }}
@@ -235,6 +247,7 @@ jobs:
           health = Path('artifacts/arena/v013/provider-health.json')
           active = Path('artifacts/arena/v013/research-providers.active.json')
           battle = Path(f'artifacts/arena/v013/swarm-battle-generation-{generation}.json')
+          evaluation = Path(f'artifacts/arena/v013/evaluation-plan-generation-{generation}.json')
           portable = Path(f'artifacts/arena/v013/portable-patches/generation-{generation}/manifest.json')
           problems = []
           if not generation:
@@ -247,9 +260,22 @@ jobs:
               problems.append('active research provider manifest has fewer than two families')
           if not battle.exists() or int(json.loads(battle.read_text()).get('selected_count', 0)) < 1:
               problems.append('council produced no selected experiment')
-          if not portable.exists() or int(json.loads(portable.read_text()).get('exported_count', 0)) < 1:
-              problems.append('no software-qualified portable cognition patch survived')
+          evaluation_count = (
+              int(json.loads(evaluation.read_text()).get('selected_count', 0))
+              if evaluation.exists()
+              else 0
+          )
+          portable_count = (
+              int(json.loads(portable.read_text()).get('exported_count', 0))
+              if portable.exists()
+              else 0
+          )
+          if evaluation_count < 1 and portable_count < 1:
+              problems.append('no executable measurement or software-qualified mutation survived')
           if problems:
               raise SystemExit('\n'.join(problems))
-          print('REMOTE SWARM HANDOFF QUALIFIED')
+          print(
+              f'REMOTE SWARM HANDOFF QUALIFIED: measurements={evaluation_count} '
+              f'portable_mutations={portable_count}'
+          )
           PY
