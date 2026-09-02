@@ -25,7 +25,6 @@ def main() -> None:
         args.build_id,
         "Qwen3.8 27B FP8",
         "run_first_tournament.py",
-        "run_arena_contestant.py",
         "splits.public.json",
         "public_dict()",
         "private_blind_materialized",
