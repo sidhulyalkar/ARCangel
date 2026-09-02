@@ -251,9 +251,12 @@ class ResearchSwarm:
             "hypothesis, experiment, target_metric, split, falsifier, implementation, failure_mode, "
             "target_profile, control_profile. target_profile and control_profile must each be one of "
             f"{list(RUNNABLE_PROFILES)}. Do not use v011 as a target_profile because it is retained "
-            "only as a historical negative control. Name the smallest executable profile whose code "
-            "your patch changes, and the exact runnable profile it must beat. Use DEV for invention "
-            "and VALIDATION for selection; never request blind identities.\n\n"
+            "only as a historical negative control. Prefer the smallest falsifiable experiment. If "
+            "existing runnable profiles can answer the question, explicitly propose a direct comparison "
+            "and say in implementation that no cognition patch is required. Only propose a code mutation "
+            "when existing profiles cannot falsify the hypothesis; then describe exactly one minimal "
+            "mechanism change. Avoid feature bundles. Use DEV for invention and VALIDATION for selection; "
+            "never request blind identities.\n\n"
         )
         if guidance:
             user += guidance + "\n\n"
@@ -291,7 +294,8 @@ No review can promote code. Measured DEV/VALIDATION results remain authoritative
             "with numeric scores in [0,1] for falsifiability, generalization, information_gain, feasibility, "
             "redundancy, persuasion_risk, confidence; verdict must be advance, test_disagreement, or reject; "
             "also provide strongest_objection and decisive_test. Check that target_profile/control_profile form "
-            "a fair executable comparison. Do not request BLIND or Kaggle evidence.\n\n"
+            "a fair executable comparison. Penalize unnecessary code changes when an existing-profile comparison "
+            "would already falsify the hypothesis. Do not request BLIND or Kaggle evidence.\n\n"
             "# ANONYMOUS PROPOSAL\n"
             + json.dumps(proposal_payload, indent=2)
             + "\n\n# RESEARCH CONTEXT\n"
