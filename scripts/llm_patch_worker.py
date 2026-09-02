@@ -12,6 +12,8 @@ from typing import Any
 
 import requests
 
+from arc3lab.arena.provider_transport import build_chat_payload, extract_message_text
+
 
 COGNITION_ROOTS = (
     "src/arc3lab/policy/",
@@ -162,20 +164,19 @@ def _chat(provider: dict[str, Any], system: str, user: str, *, max_tokens: int) 
     response = requests.post(
         f"{base_url}/chat/completions",
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-        json={
-            "model": str(provider["model"]),
-            "messages": [
+        json=build_chat_payload(
+            provider,
+            messages=(
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
-            ],
-            "temperature": 0.1,
-            "max_tokens": max(256, int(max_tokens)),
-        },
+            ),
+            temperature=0.1,
+            max_tokens=max(256, int(max_tokens)),
+        ),
         timeout=max(30.0, float(provider.get("timeout_seconds", 600.0))),
     )
     response.raise_for_status()
-    data = response.json()
-    return str(data["choices"][0]["message"]["content"])
+    return extract_message_text(response.json())
 
 
 def _prompt(proposal: dict[str, Any], context: str, previous_error: str = "") -> tuple[str, str]:
