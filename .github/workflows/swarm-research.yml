@@ -56,16 +56,17 @@ jobs:
           git status --short
 
       - name: Probe heterogeneous NVIDIA endpoints
+        id: providers
         run: >-
           python scripts/check_research_providers.py
           --providers configs/research-providers.nvidia-swarm.json
           --output artifacts/arena/v013/provider-health.json
 
       - name: Run independent swarm and blinded council
+        id: council
         run: >-
           python scripts/run_swarm_research_cycle.py
           --providers configs/research-providers.nvidia-swarm.json
-          --workers configs/experiment-workers.nvidia.json
           --manifest configs/swarm-v013.json
           --arena-root artifacts/arena/v013
           --repo-root .
@@ -76,9 +77,22 @@ jobs:
           --reviews-per-proposal 3
           --min-reviews 2
           --max-workers 6
-          --execute-workers
+
+      - name: Implement council-selected cognition patches
+        id: workers
+        continue-on-error: true
+        run: >-
+          python scripts/run_experiment_workers.py
+          --workers configs/experiment-workers.nvidia.json
+          --battle-plan 'artifacts/arena/v013/swarm-battle-generation-${{ inputs.generation }}.json'
+          --repo-root .
+          --worktree-root ../arcangel-experiment-worktrees
+          --receipt-root artifacts/arena/v013/worker-receipts
+          --base-ref '${{ steps.base.outputs.sha }}'
 
       - name: Export cognition-only worker patches
+        id: patches
+        continue-on-error: true
         run: >-
           python scripts/export_swarm_worker_patches.py
           --battle-plan 'artifacts/arena/v013/swarm-battle-generation-${{ inputs.generation }}.json'
@@ -89,6 +103,8 @@ jobs:
           --output-dir 'artifacts/arena/v013/portable-patches/generation-${{ inputs.generation }}'
 
       - name: Export blind-safe research context receipt
+        if: always()
+        continue-on-error: true
         run: >-
           python scripts/export_swarm_context.py
           --manifest configs/swarm-v013.json
@@ -97,11 +113,12 @@ jobs:
           --output 'artifacts/arena/v013/swarm-context-generation-${{ inputs.generation }}.tar.gz'
           --receipt 'artifacts/arena/v013/swarm-context-generation-${{ inputs.generation }}.json'
 
-      - name: Upload research handoff
+      - name: Upload research handoff and failure evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: arcangel-swarm-generation-${{ inputs.generation }}-${{ steps.base.outputs.sha }}
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
           path: |
             artifacts/arena/v013/provider-health.json
@@ -113,3 +130,28 @@ jobs:
             artifacts/arena/v013/portable-patches/generation-${{ inputs.generation }}/
             artifacts/arena/v013/swarm-context-generation-${{ inputs.generation }}.tar.gz
             artifacts/arena/v013/swarm-context-generation-${{ inputs.generation }}.json
+
+      - name: Qualify portable handoff
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          generation = os.environ.get('GENERATION', '${{ inputs.generation }}')
+          health = Path('artifacts/arena/v013/provider-health.json')
+          battle = Path(f'artifacts/arena/v013/swarm-battle-generation-{generation}.json')
+          portable = Path(f'artifacts/arena/v013/portable-patches/generation-{generation}/manifest.json')
+          problems = []
+          if not health.exists() or json.loads(health.read_text()).get('status') != 'HEALTHY':
+              problems.append('heterogeneous provider health gate did not pass')
+          if not battle.exists() or int(json.loads(battle.read_text()).get('selected_count', 0)) < 1:
+              problems.append('council produced no selected experiment')
+          if not portable.exists() or int(json.loads(portable.read_text()).get('exported_count', 0)) < 1:
+              problems.append('no software-qualified portable cognition patch survived')
+          if problems:
+              raise SystemExit('\n'.join(problems))
+          print('REMOTE SWARM HANDOFF QUALIFIED')
+          PY
