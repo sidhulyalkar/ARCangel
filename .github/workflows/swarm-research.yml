@@ -1,0 +1,115 @@
+name: swarm-research
+
+on:
+  workflow_dispatch:
+    inputs:
+      generation:
+        description: 'Swarm generation number'
+        required: true
+        default: '1'
+        type: string
+      max_proposals:
+        description: 'Maximum council-selected coding experiments'
+        required: true
+        default: '4'
+        type: string
+
+concurrency:
+  group: swarm-research-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  nvidia-research-swarm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ARCangel
+        run: python -m pip install -e '.[dev]'
+
+      - name: Require NVIDIA research credential
+        shell: bash
+        run: |
+          if [ -z "$NVIDIA_API_KEY" ]; then
+            echo 'NVIDIA_API_KEY GitHub Actions secret is required.' >&2
+            exit 2
+          fi
+
+      - name: Record immutable research base
+        id: base
+        shell: bash
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git status --short
+
+      - name: Probe heterogeneous NVIDIA endpoints
+        run: >-
+          python scripts/check_research_providers.py
+          --providers configs/research-providers.nvidia-swarm.json
+          --output artifacts/arena/v013/provider-health.json
+
+      - name: Run independent swarm and blinded council
+        run: >-
+          python scripts/run_swarm_research_cycle.py
+          --providers configs/research-providers.nvidia-swarm.json
+          --workers configs/experiment-workers.nvidia.json
+          --manifest configs/swarm-v013.json
+          --arena-root artifacts/arena/v013
+          --repo-root .
+          --generation '${{ inputs.generation }}'
+          --max-proposals '${{ inputs.max_proposals }}'
+          --max-research-requests 20
+          --max-review-requests 60
+          --reviews-per-proposal 3
+          --min-reviews 2
+          --max-workers 6
+          --execute-workers
+
+      - name: Export cognition-only worker patches
+        run: >-
+          python scripts/export_swarm_worker_patches.py
+          --battle-plan 'artifacts/arena/v013/swarm-battle-generation-${{ inputs.generation }}.json'
+          --base-sha '${{ steps.base.outputs.sha }}'
+          --repo-root .
+          --worktree-root ../arcangel-experiment-worktrees
+          --receipt-root artifacts/arena/v013/worker-receipts
+          --output-dir 'artifacts/arena/v013/portable-patches/generation-${{ inputs.generation }}'
+
+      - name: Export blind-safe research context receipt
+        run: >-
+          python scripts/export_swarm_context.py
+          --manifest configs/swarm-v013.json
+          --arena-root artifacts/arena/v013
+          --repo-root .
+          --output 'artifacts/arena/v013/swarm-context-generation-${{ inputs.generation }}.tar.gz'
+          --receipt 'artifacts/arena/v013/swarm-context-generation-${{ inputs.generation }}.json'
+
+      - name: Upload research handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcangel-swarm-generation-${{ inputs.generation }}-${{ steps.base.outputs.sha }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            artifacts/arena/v013/provider-health.json
+            artifacts/arena/v013/proposals/generation-${{ inputs.generation }}/
+            artifacts/arena/v013/reviews/generation-${{ inputs.generation }}/
+            artifacts/arena/v013/swarm-battle-generation-${{ inputs.generation }}.json
+            artifacts/arena/v013/swarm-cycle-generation-${{ inputs.generation }}.json
+            artifacts/arena/v013/worker-receipts/
+            artifacts/arena/v013/portable-patches/generation-${{ inputs.generation }}/
+            artifacts/arena/v013/swarm-context-generation-${{ inputs.generation }}.tar.gz
+            artifacts/arena/v013/swarm-context-generation-${{ inputs.generation }}.json
