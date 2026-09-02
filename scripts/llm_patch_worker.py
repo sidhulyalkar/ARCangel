@@ -8,7 +8,7 @@ import re
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import requests
 
