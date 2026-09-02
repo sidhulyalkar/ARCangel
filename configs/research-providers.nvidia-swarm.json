@@ -8,6 +8,13 @@
       "roles": ["minimalist", "runtime", "integrator"],
       "max_tokens": 3000,
       "timeout_seconds": 600,
+      "health_timeout_seconds": 60,
+      "request_body": {
+        "top_p": 0.95,
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
       "enabled": true
     },
     {
@@ -18,6 +25,13 @@
       "roles": ["scientist", "planner", "memory", "generalization"],
       "max_tokens": 4000,
       "timeout_seconds": 600,
+      "health_timeout_seconds": 120,
+      "request_body": {
+        "top_p": 0.95,
+        "chat_template_kwargs": {
+          "thinking": false
+        }
+      },
       "enabled": true
     },
     {
@@ -26,8 +40,13 @@
       "model": "moonshotai/kimi-k3",
       "api_key_env": "NVIDIA_API_KEY",
       "roles": ["explorer", "vision", "red_team"],
-      "max_tokens": 4000,
+      "max_tokens": 5000,
       "timeout_seconds": 600,
+      "health_timeout_seconds": 90,
+      "request_body": {
+        "top_p": 0.95,
+        "reasoning_effort": "low"
+      },
       "enabled": true
     }
   ]
