@@ -1,0 +1,5 @@
+{
+  "generation": 1,
+  "max_proposals": 4,
+  "purpose": "First heterogeneous V013 swarm generation after focused software qualification. Research and patch coding only; no Qwen arena, BLIND, packaging, or Kaggle authority."
+}
