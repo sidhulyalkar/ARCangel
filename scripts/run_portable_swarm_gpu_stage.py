@@ -160,6 +160,15 @@ def _fitness(path: Path) -> dict[str, Any]:
     return dict(json.loads(path.read_text(encoding="utf-8")).get("fitness") or {})
 
 
+def _portable_metadata_path(manifest_path: Path, row: dict[str, Any]) -> Path:
+    raw_patch = Path(str(row.get("patch", "")))
+    name = raw_patch.with_suffix(".json").name
+    candidate = manifest_path.parent / name
+    if not candidate.exists():
+        raise FileNotFoundError(candidate)
+    return candidate
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Run GPU evidence stage from a portable remote swarm handoff")
     ap.add_argument("--patch-manifest", required=True)
@@ -184,7 +193,8 @@ def main() -> int:
     rules = manifest.promotion
     dev_delta = rules.min_dev_delta if args.dev_screen_delta is None else float(args.dev_screen_delta)
     validation_seeds = max(2, rules.min_validation_runs, int(args.validation_seeds))
-    patch_manifest = json.loads(Path(args.patch_manifest).read_text(encoding="utf-8"))
+    patch_manifest_path = Path(args.patch_manifest).resolve()
+    patch_manifest = json.loads(patch_manifest_path.read_text(encoding="utf-8"))
     battle = json.loads(Path(args.battle_plan).read_text(encoding="utf-8"))
     battle_rows = {str(row["proposal_id"]): dict(row) for row in battle.get("selected", [])}
     worktree_root = Path(args.worktree_root).resolve()
@@ -195,9 +205,7 @@ def main() -> int:
         proposal_id = str(metadata.get("proposal_id", ""))
         if proposal_id not in battle_rows:
             raise ValueError(f"portable patch {proposal_id} is absent from supplied battle plan")
-        metadata_path = Path(args.patch_manifest).parent / f"{_slug(proposal_id)}.json"
-        if not metadata_path.exists():
-            raise FileNotFoundError(metadata_path)
+        metadata_path = _portable_metadata_path(patch_manifest_path, dict(metadata))
         worktree = worktree_root / _slug(proposal_id)
         _run(
             [
