@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -10,6 +11,23 @@ from pathlib import Path
 def run(command: list[str]) -> None:
     print("SWARM CYCLE EXEC:", " ".join(command), flush=True)
     subprocess.run(command, check=True)
+
+
+def stamp_generation(path: Path, generation: int) -> dict[str, object]:
+    payload = json.loads(path.read_text())
+    payload["generation"] = generation
+    for row in payload.get("selected", []):
+        old_id = str(row.get("proposal_id", "")).strip()
+        if not old_id:
+            raise ValueError("selected swarm proposal is missing proposal_id")
+        prefix = f"G{generation}-"
+        proposal_id = old_id if old_id.startswith(prefix) else prefix + old_id
+        row["proposal_id"] = proposal_id
+        row["generation"] = generation
+        branch_slug = re.sub(r"[^a-z0-9]+", "-", proposal_id.lower()).strip("-")
+        row["suggested_branch"] = f"experiment/{branch_slug[:160]}"
+    path.write_text(json.dumps(payload, indent=2) + "\n")
+    return payload
 
 
 def main() -> int:
@@ -93,6 +111,7 @@ def main() -> int:
             str(battle),
         ]
     )
+    battle_payload = stamp_generation(battle, generation)
 
     worker_mode = "not_configured"
     if args.workers:
@@ -115,7 +134,6 @@ def main() -> int:
             worker_mode = "executed"
         run(command)
 
-    battle_payload = json.loads(battle.read_text())
     payload = {
         "generation": generation,
         "providers": args.providers,
@@ -125,9 +143,11 @@ def main() -> int:
         "selected": battle_payload.get("selected_count", 0),
         "worker_mode": worker_mode,
         "next_step": (
-            "Run selected isolated branches through the controlled ARC arena, then record measured DEV/VALIDATION utility with scripts/record_swarm_outcome.py before generation + 1."
+            "For each software-qualified selected worktree, run scripts/run_guarded_swarm_experiment.py "
+            "against its declared paired control. The guarded runner writes repeat-aware DEV/VALIDATION "
+            "fitness into swarm memory without exposing BLIND or Kaggle evidence."
         ),
-        "authority": "swarm searches; measured arena evidence promotes",
+        "authority": "swarm searches; trusted paired arena evidence promotes",
     }
     receipt.parent.mkdir(parents=True, exist_ok=True)
     receipt.write_text(json.dumps(payload, indent=2) + "\n")
