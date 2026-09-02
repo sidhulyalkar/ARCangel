@@ -18,19 +18,16 @@
       "enabled": true
     },
     {
-      "id": "nvidia-deepseek-v4-pro",
+      "id": "nvidia-laguna-xs21",
       "base_url": "https://integrate.api.nvidia.com/v1",
-      "model": "deepseek-ai/deepseek-v4-pro-0813",
+      "model": "poolside/laguna-xs-2.1",
       "api_key_env": "NVIDIA_API_KEY",
       "roles": ["scientist", "planner", "memory", "generalization"],
       "max_tokens": 4000,
       "timeout_seconds": 600,
-      "health_timeout_seconds": 120,
+      "health_timeout_seconds": 60,
       "request_body": {
-        "top_p": 0.95,
-        "chat_template_kwargs": {
-          "thinking": false
-        }
+        "top_p": 0.95
       },
       "enabled": true
     },
