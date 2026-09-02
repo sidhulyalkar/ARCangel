@@ -11,11 +11,8 @@ from arc3lab.arena.research_agents import ProviderSpec
 
 def test_provider_options_are_merged_without_surrendering_core_fields() -> None:
     provider = {
-        "model": "deepseek-ai/example",
-        "request_body": {
-            "top_p": 0.95,
-            "chat_template_kwargs": {"thinking": False},
-        },
+        "model": "poolside/example",
+        "request_body": {"top_p": 0.95},
     }
     payload = build_chat_payload(
         provider,
@@ -24,13 +21,12 @@ def test_provider_options_are_merged_without_surrendering_core_fields() -> None:
         max_tokens=123,
     )
 
-    assert payload["model"] == "deepseek-ai/example"
+    assert payload["model"] == "poolside/example"
     assert payload["messages"] == [{"role": "user", "content": "hello"}]
     assert payload["temperature"] == 0.2
     assert payload["max_tokens"] == 123
     assert payload["stream"] is False
     assert payload["top_p"] == 0.95
-    assert payload["chat_template_kwargs"] == {"thinking": False}
 
 
 def test_provider_options_cannot_override_judge_owned_request_identity() -> None:
@@ -70,18 +66,31 @@ def test_message_extraction_supports_reasoning_only_endpoints() -> None:
     )
 
 
-def test_nvidia_swarm_pins_model_specific_reasoning_modes() -> None:
+def test_nvidia_swarm_pins_three_distinct_operational_families() -> None:
     payload = json.loads(Path("configs/research-providers.nvidia-swarm.json").read_text())
     rows = {row["id"]: row for row in payload["providers"]}
 
     nemotron = rows["nvidia-nemotron35-lightning"]
-    deepseek = rows["nvidia-deepseek-v4-pro"]
+    laguna = rows["nvidia-laguna-xs21"]
     kimi = rows["nvidia-kimi-k3"]
 
+    assert nemotron["model"] == "nvidia/nemotron-3.5-lightning-30b-a3b"
     assert nemotron["request_body"]["chat_template_kwargs"]["enable_thinking"] is False
-    assert deepseek["request_body"]["chat_template_kwargs"]["thinking"] is False
-    assert deepseek["health_timeout_seconds"] >= 120
+    assert laguna["model"] == "poolside/laguna-xs-2.1"
+    assert set(laguna["roles"]) >= {"scientist", "planner", "memory", "generalization"}
+    assert laguna["health_timeout_seconds"] <= 60
+    assert kimi["model"] == "moonshotai/kimi-k3"
     assert kimi["request_body"]["reasoning_effort"] == "low"
 
-    spec = ProviderSpec.from_dict(kimi)
-    assert spec.request_body["reasoning_effort"] == "low"
+    families = {row["model"].split("/", 1)[0] for row in payload["providers"]}
+    assert families == {"nvidia", "poolside", "moonshotai"}
+
+    spec = ProviderSpec.from_dict(laguna)
+    assert spec.request_body["top_p"] == 0.95
+
+
+def test_nvidia_patch_worker_uses_operational_coding_provider() -> None:
+    worker = json.loads(Path("configs/experiment-workers.nvidia.json").read_text())["workers"][0]
+    command = worker["command"]
+    assert "nvidia-laguna-xs21" in command
+    assert "nvidia-deepseek-v4-pro" not in command
