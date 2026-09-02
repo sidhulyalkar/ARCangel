@@ -7,6 +7,8 @@ from pathlib import Path
 
 REQUIRED = (
     "workflow_dispatch",
+    "[run-swarm-research]",
+    ".github/swarm-research-trigger.json",
     "NVIDIA_API_KEY",
     "check_research_providers.py",
     "run_swarm_research_cycle.py",
@@ -43,8 +45,8 @@ def main() -> int:
             lines.append(f"research workflow contains forbidden evaluator commands: {forbidden}")
         raise SystemExit("\n".join(lines))
     print(
-        "SWARM RESEARCH WORKFLOW VERIFIED: NVIDIA agents may generate/review/code patches; "
-        "Qwen arena, BLIND, packaging, and Kaggle remain outside this workflow."
+        "SWARM RESEARCH WORKFLOW VERIFIED: explicit trigger only; NVIDIA agents may "
+        "generate/review/code patches; Qwen arena, BLIND, packaging, and Kaggle remain outside."
     )
     return 0
 
