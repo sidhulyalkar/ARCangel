@@ -27,6 +27,7 @@ def main() -> None:
         "run_first_tournament.py",
         "splits.public.json",
         "public_dict()",
+        "arcangel-v013-public-research-split-v1",
         "private_blind_materialized",
         "first-tournament-scorecard.json",
         "Research tournament must not create submission.parquet",
