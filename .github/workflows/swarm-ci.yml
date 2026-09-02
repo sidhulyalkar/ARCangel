@@ -13,6 +13,8 @@ on:
       - 'scripts/run_research_swarm.py'
       - 'scripts/run_swarm_council.py'
       - 'scripts/run_swarm_research_cycle.py'
+      - 'scripts/route_swarm_experiments.py'
+      - 'scripts/run_swarm_measurement_gpu_stage.py'
       - 'scripts/run_autonomous_swarm_generation.py'
       - 'scripts/run_swarm_experiment.py'
       - 'scripts/run_guarded_swarm_experiment.py'
@@ -21,6 +23,7 @@ on:
       - 'scripts/promote_swarm_experiment.py'
       - 'scripts/package_promoted_swarm.py'
       - 'scripts/llm_patch_worker.py'
+      - 'scripts/retrying_llm_patch_worker.py'
       - 'scripts/check_research_providers.py'
       - 'scripts/export_swarm_worker_patches.py'
       - 'scripts/materialize_swarm_patch.py'
@@ -53,6 +56,8 @@ on:
       - 'scripts/run_research_swarm.py'
       - 'scripts/run_swarm_council.py'
       - 'scripts/run_swarm_research_cycle.py'
+      - 'scripts/route_swarm_experiments.py'
+      - 'scripts/run_swarm_measurement_gpu_stage.py'
       - 'scripts/run_autonomous_swarm_generation.py'
       - 'scripts/run_swarm_experiment.py'
       - 'scripts/run_guarded_swarm_experiment.py'
@@ -61,6 +66,7 @@ on:
       - 'scripts/promote_swarm_experiment.py'
       - 'scripts/package_promoted_swarm.py'
       - 'scripts/llm_patch_worker.py'
+      - 'scripts/retrying_llm_patch_worker.py'
       - 'scripts/check_research_providers.py'
       - 'scripts/export_swarm_worker_patches.py'
       - 'scripts/materialize_swarm_patch.py'
@@ -115,6 +121,8 @@ jobs:
           scripts/run_research_swarm.py
           scripts/run_swarm_council.py
           scripts/run_swarm_research_cycle.py
+          scripts/route_swarm_experiments.py
+          scripts/run_swarm_measurement_gpu_stage.py
           scripts/run_autonomous_swarm_generation.py
           scripts/run_swarm_experiment.py
           scripts/run_guarded_swarm_experiment.py
@@ -123,6 +131,7 @@ jobs:
           scripts/promote_swarm_experiment.py
           scripts/package_promoted_swarm.py
           scripts/llm_patch_worker.py
+          scripts/retrying_llm_patch_worker.py
           scripts/check_research_providers.py
           scripts/export_swarm_worker_patches.py
           scripts/materialize_swarm_patch.py
@@ -149,6 +158,8 @@ jobs:
           scripts/run_research_swarm.py
           scripts/run_swarm_council.py
           scripts/run_swarm_research_cycle.py
+          scripts/route_swarm_experiments.py
+          scripts/run_swarm_measurement_gpu_stage.py
           scripts/run_autonomous_swarm_generation.py
           scripts/run_swarm_experiment.py
           scripts/run_guarded_swarm_experiment.py
@@ -157,6 +168,7 @@ jobs:
           scripts/promote_swarm_experiment.py
           scripts/package_promoted_swarm.py
           scripts/llm_patch_worker.py
+          scripts/retrying_llm_patch_worker.py
           scripts/check_research_providers.py
           scripts/export_swarm_worker_patches.py
           scripts/materialize_swarm_patch.py
