@@ -1,6 +1,9 @@
 name: swarm-research
 
 on:
+  push:
+    branches:
+      - 'agent/v013-autonomous-research-swarm'
   workflow_dispatch:
     inputs:
       generation:
@@ -23,6 +26,9 @@ permissions:
 
 jobs:
   nvidia-research-swarm:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '[run-swarm-research]')
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
@@ -48,6 +54,37 @@ jobs:
             exit 2
           fi
 
+      - name: Resolve generation parameters
+        id: params
+        env:
+          DISPATCH_GENERATION: ${{ inputs.generation }}
+          DISPATCH_MAX_PROPOSALS: ${{ inputs.max_proposals }}
+          EVENT_NAME: ${{ github.event_name }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          if os.environ.get('EVENT_NAME') == 'workflow_dispatch':
+              generation = int(os.environ.get('DISPATCH_GENERATION') or '1')
+              max_proposals = int(os.environ.get('DISPATCH_MAX_PROPOSALS') or '4')
+          else:
+              trigger = Path('.github/swarm-research-trigger.json')
+              if not trigger.exists():
+                  raise SystemExit('push-triggered swarm run requires .github/swarm-research-trigger.json')
+              payload = json.loads(trigger.read_text())
+              generation = int(payload.get('generation', 1))
+              max_proposals = int(payload.get('max_proposals', 4))
+          if generation < 1 or not 1 <= max_proposals <= 8:
+              raise SystemExit('invalid swarm trigger parameters')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as handle:
+              handle.write(f'generation={generation}\n')
+              handle.write(f'max_proposals={max_proposals}\n')
+          print(json.dumps({'generation': generation, 'max_proposals': max_proposals}, indent=2))
+          PY
+
       - name: Record immutable research base
         id: base
         shell: bash
@@ -70,8 +107,8 @@ jobs:
           --manifest configs/swarm-v013.json
           --arena-root artifacts/arena/v013
           --repo-root .
-          --generation '${{ inputs.generation }}'
-          --max-proposals '${{ inputs.max_proposals }}'
+          --generation '${{ steps.params.outputs.generation }}'
+          --max-proposals '${{ steps.params.outputs.max_proposals }}'
           --max-research-requests 20
           --max-review-requests 60
           --reviews-per-proposal 3
@@ -84,7 +121,7 @@ jobs:
         run: >-
           python scripts/run_experiment_workers.py
           --workers configs/experiment-workers.nvidia.json
-          --battle-plan 'artifacts/arena/v013/swarm-battle-generation-${{ inputs.generation }}.json'
+          --battle-plan 'artifacts/arena/v013/swarm-battle-generation-${{ steps.params.outputs.generation }}.json'
           --repo-root .
           --worktree-root ../arcangel-experiment-worktrees
           --receipt-root artifacts/arena/v013/worker-receipts
@@ -95,12 +132,12 @@ jobs:
         continue-on-error: true
         run: >-
           python scripts/export_swarm_worker_patches.py
-          --battle-plan 'artifacts/arena/v013/swarm-battle-generation-${{ inputs.generation }}.json'
+          --battle-plan 'artifacts/arena/v013/swarm-battle-generation-${{ steps.params.outputs.generation }}.json'
           --base-sha '${{ steps.base.outputs.sha }}'
           --repo-root .
           --worktree-root ../arcangel-experiment-worktrees
           --receipt-root artifacts/arena/v013/worker-receipts
-          --output-dir 'artifacts/arena/v013/portable-patches/generation-${{ inputs.generation }}'
+          --output-dir 'artifacts/arena/v013/portable-patches/generation-${{ steps.params.outputs.generation }}'
 
       - name: Export blind-safe research context receipt
         if: always()
@@ -110,29 +147,31 @@ jobs:
           --manifest configs/swarm-v013.json
           --arena-root artifacts/arena/v013
           --repo-root .
-          --output 'artifacts/arena/v013/swarm-context-generation-${{ inputs.generation }}.tar.gz'
-          --receipt 'artifacts/arena/v013/swarm-context-generation-${{ inputs.generation }}.json'
+          --output 'artifacts/arena/v013/swarm-context-generation-${{ steps.params.outputs.generation }}.tar.gz'
+          --receipt 'artifacts/arena/v013/swarm-context-generation-${{ steps.params.outputs.generation }}.json'
 
       - name: Upload research handoff and failure evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: arcangel-swarm-generation-${{ inputs.generation }}-${{ steps.base.outputs.sha }}
+          name: arcangel-swarm-generation-${{ steps.params.outputs.generation }}-${{ steps.base.outputs.sha }}
           if-no-files-found: warn
           retention-days: 30
           path: |
             artifacts/arena/v013/provider-health.json
-            artifacts/arena/v013/proposals/generation-${{ inputs.generation }}/
-            artifacts/arena/v013/reviews/generation-${{ inputs.generation }}/
-            artifacts/arena/v013/swarm-battle-generation-${{ inputs.generation }}.json
-            artifacts/arena/v013/swarm-cycle-generation-${{ inputs.generation }}.json
+            artifacts/arena/v013/proposals/generation-${{ steps.params.outputs.generation }}/
+            artifacts/arena/v013/reviews/generation-${{ steps.params.outputs.generation }}/
+            artifacts/arena/v013/swarm-battle-generation-${{ steps.params.outputs.generation }}.json
+            artifacts/arena/v013/swarm-cycle-generation-${{ steps.params.outputs.generation }}.json
             artifacts/arena/v013/worker-receipts/
-            artifacts/arena/v013/portable-patches/generation-${{ inputs.generation }}/
-            artifacts/arena/v013/swarm-context-generation-${{ inputs.generation }}.tar.gz
-            artifacts/arena/v013/swarm-context-generation-${{ inputs.generation }}.json
+            artifacts/arena/v013/portable-patches/generation-${{ steps.params.outputs.generation }}/
+            artifacts/arena/v013/swarm-context-generation-${{ steps.params.outputs.generation }}.tar.gz
+            artifacts/arena/v013/swarm-context-generation-${{ steps.params.outputs.generation }}.json
 
       - name: Qualify portable handoff
         if: always()
+        env:
+          GENERATION: ${{ steps.params.outputs.generation }}
         shell: bash
         run: |
           python - <<'PY'
@@ -140,11 +179,13 @@ jobs:
           import os
           from pathlib import Path
 
-          generation = os.environ.get('GENERATION', '${{ inputs.generation }}')
+          generation = os.environ.get('GENERATION', '')
           health = Path('artifacts/arena/v013/provider-health.json')
           battle = Path(f'artifacts/arena/v013/swarm-battle-generation-{generation}.json')
           portable = Path(f'artifacts/arena/v013/portable-patches/generation-{generation}/manifest.json')
           problems = []
+          if not generation:
+              problems.append('generation parameters were not resolved')
           if not health.exists() or json.loads(health.read_text()).get('status') != 'HEALTHY':
               problems.append('heterogeneous provider health gate did not pass')
           if not battle.exists() or int(json.loads(battle.read_text()).get('selected_count', 0)) < 1:
