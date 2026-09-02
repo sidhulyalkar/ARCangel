@@ -3,12 +3,13 @@ from __future__ import annotations
 import json
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
 import requests
 
+from arc3lab.arena.provider_transport import build_chat_payload, extract_message_text
 from arc3lab.arena.research_packet import DEFAULT_ROLES, ResearchPacketBuilder, ResearchRole
 from arc3lab.arena.swarm_intelligence import (
     ResearchReview,
@@ -29,10 +30,14 @@ class ProviderSpec:
     roles: tuple[str, ...] = ()
     max_tokens: int = 3000
     timeout_seconds: float = 600.0
+    request_body: dict[str, Any] = field(default_factory=dict)
     enabled: bool = True
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ProviderSpec":
+        request_body = data.get("request_body") or {}
+        if not isinstance(request_body, dict):
+            raise TypeError(f"provider {data.get('id')} request_body must be an object")
         return cls(
             provider_id=str(data["id"]),
             base_url=str(data["base_url"]).rstrip("/"),
@@ -41,8 +46,15 @@ class ProviderSpec:
             roles=tuple(str(role) for role in data.get("roles", ())),
             max_tokens=max(256, int(data.get("max_tokens", 3000))),
             timeout_seconds=max(10.0, float(data.get("timeout_seconds", 600.0))),
+            request_body=dict(request_body),
             enabled=bool(data.get("enabled", True)),
         )
+
+    def transport_dict(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "request_body": self.request_body,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -204,23 +216,23 @@ class ResearchSwarm:
         key = os.getenv(provider.api_key_env, "") if provider.api_key_env else ""
         if not key:
             raise RuntimeError(f"MISSING_API_KEY:{provider.api_key_env}")
+        payload = build_chat_payload(
+            provider.transport_dict(),
+            messages=(
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ),
+            temperature=temperature,
+            max_tokens=provider.max_tokens,
+        )
         response = requests.post(
             f"{provider.base_url}/chat/completions",
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            json={
-                "model": provider.model,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                "temperature": temperature,
-                "max_tokens": provider.max_tokens,
-            },
+            json=payload,
             timeout=provider.timeout_seconds,
         )
         response.raise_for_status()
-        data = response.json()
-        return str(data["choices"][0]["message"]["content"])
+        return extract_message_text(response.json())
 
     def _call(
         self,
