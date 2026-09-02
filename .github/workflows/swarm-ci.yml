@@ -8,12 +8,17 @@ on:
       - 'scripts/run_swarm_lab.py'
       - 'scripts/run_arena_contestant.py'
       - 'scripts/run_first_tournament.py'
+      - 'scripts/run_augmented_blind.py'
       - 'scripts/run_v013_campaign.py'
       - 'scripts/run_research_swarm.py'
       - 'scripts/run_swarm_council.py'
       - 'scripts/run_swarm_research_cycle.py'
+      - 'scripts/run_autonomous_swarm_generation.py'
       - 'scripts/run_swarm_experiment.py'
       - 'scripts/run_guarded_swarm_experiment.py'
+      - 'scripts/run_promoted_swarm_contestant.py'
+      - 'scripts/promote_swarm_experiment.py'
+      - 'scripts/package_promoted_swarm.py'
       - 'scripts/ingest_swarm_fitness.py'
       - 'scripts/record_swarm_outcome.py'
       - 'scripts/init_swarm_splits.py'
@@ -36,12 +41,17 @@ on:
       - 'scripts/run_swarm_lab.py'
       - 'scripts/run_arena_contestant.py'
       - 'scripts/run_first_tournament.py'
+      - 'scripts/run_augmented_blind.py'
       - 'scripts/run_v013_campaign.py'
       - 'scripts/run_research_swarm.py'
       - 'scripts/run_swarm_council.py'
       - 'scripts/run_swarm_research_cycle.py'
+      - 'scripts/run_autonomous_swarm_generation.py'
       - 'scripts/run_swarm_experiment.py'
       - 'scripts/run_guarded_swarm_experiment.py'
+      - 'scripts/run_promoted_swarm_contestant.py'
+      - 'scripts/promote_swarm_experiment.py'
+      - 'scripts/package_promoted_swarm.py'
       - 'scripts/ingest_swarm_fitness.py'
       - 'scripts/record_swarm_outcome.py'
       - 'scripts/init_swarm_splits.py'
@@ -85,12 +95,17 @@ jobs:
           scripts/run_swarm_lab.py
           scripts/run_arena_contestant.py
           scripts/run_first_tournament.py
+          scripts/run_augmented_blind.py
           scripts/run_v013_campaign.py
           scripts/run_research_swarm.py
           scripts/run_swarm_council.py
           scripts/run_swarm_research_cycle.py
+          scripts/run_autonomous_swarm_generation.py
           scripts/run_swarm_experiment.py
           scripts/run_guarded_swarm_experiment.py
+          scripts/run_promoted_swarm_contestant.py
+          scripts/promote_swarm_experiment.py
+          scripts/package_promoted_swarm.py
           scripts/ingest_swarm_fitness.py
           scripts/record_swarm_outcome.py
           scripts/init_swarm_splits.py
@@ -108,12 +123,17 @@ jobs:
           scripts/run_swarm_lab.py
           scripts/run_arena_contestant.py
           scripts/run_first_tournament.py
+          scripts/run_augmented_blind.py
           scripts/run_v013_campaign.py
           scripts/run_research_swarm.py
           scripts/run_swarm_council.py
           scripts/run_swarm_research_cycle.py
+          scripts/run_autonomous_swarm_generation.py
           scripts/run_swarm_experiment.py
           scripts/run_guarded_swarm_experiment.py
+          scripts/run_promoted_swarm_contestant.py
+          scripts/promote_swarm_experiment.py
+          scripts/package_promoted_swarm.py
           scripts/ingest_swarm_fitness.py
           scripts/record_swarm_outcome.py
           scripts/init_swarm_splits.py
