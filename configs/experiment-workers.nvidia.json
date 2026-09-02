@@ -1,7 +1,7 @@
 {
   "workers": [
     {
-      "id": "nvidia-deepseek-patch-worker",
+      "id": "nvidia-laguna-patch-worker",
       "command": [
         "python",
         "scripts/llm_patch_worker.py",
@@ -12,7 +12,7 @@
         "--providers",
         "configs/research-providers.nvidia-swarm.json",
         "--provider",
-        "nvidia-deepseek-v4-pro",
+        "nvidia-laguna-xs21",
         "--repair-attempts",
         "2"
       ],
