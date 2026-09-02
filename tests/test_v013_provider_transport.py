@@ -94,3 +94,24 @@ def test_nvidia_patch_worker_uses_operational_coding_provider() -> None:
     command = worker["command"]
     assert "nvidia-laguna-xs21" in command
     assert "nvidia-deepseek-v4-pro" not in command
+
+
+def test_research_workflow_uses_required_two_family_active_quorum() -> None:
+    text = Path(".github/workflows/swarm-research.yml").read_text()
+
+    assert "--min-healthy 2" in text
+    assert "--require-provider nvidia-laguna-xs21" in text
+    assert "--active-output artifacts/arena/v013/research-providers.active.json" in text
+    assert "--providers artifacts/arena/v013/research-providers.active.json" in text
+    assert "research_quorum_met" in text
+    assert "len(json.loads(active.read_text()).get('providers', [])) < 2" in text
+
+
+def test_health_checker_distinguishes_degraded_quorum_from_unhealthy() -> None:
+    text = Path("scripts/check_research_providers.py").read_text()
+
+    assert 'return "DEGRADED", missing_required' in text
+    assert 'return "UNHEALTHY", missing_required' in text
+    assert '"research_quorum_met": status in {"HEALTHY", "DEGRADED"}' in text
+    assert 'required_provider_ids' in text
+    assert 'unhealthy_provider_ids' in text
