@@ -13,6 +13,7 @@ on:
       - 'scripts/run_swarm_council.py'
       - 'scripts/run_swarm_research_cycle.py'
       - 'scripts/run_swarm_experiment.py'
+      - 'scripts/run_guarded_swarm_experiment.py'
       - 'scripts/ingest_swarm_fitness.py'
       - 'scripts/record_swarm_outcome.py'
       - 'scripts/init_swarm_splits.py'
@@ -40,6 +41,7 @@ on:
       - 'scripts/run_swarm_council.py'
       - 'scripts/run_swarm_research_cycle.py'
       - 'scripts/run_swarm_experiment.py'
+      - 'scripts/run_guarded_swarm_experiment.py'
       - 'scripts/ingest_swarm_fitness.py'
       - 'scripts/record_swarm_outcome.py'
       - 'scripts/init_swarm_splits.py'
@@ -88,6 +90,7 @@ jobs:
           scripts/run_swarm_council.py
           scripts/run_swarm_research_cycle.py
           scripts/run_swarm_experiment.py
+          scripts/run_guarded_swarm_experiment.py
           scripts/ingest_swarm_fitness.py
           scripts/record_swarm_outcome.py
           scripts/init_swarm_splits.py
@@ -110,6 +113,7 @@ jobs:
           scripts/run_swarm_council.py
           scripts/run_swarm_research_cycle.py
           scripts/run_swarm_experiment.py
+          scripts/run_guarded_swarm_experiment.py
           scripts/ingest_swarm_fitness.py
           scripts/record_swarm_outcome.py
           scripts/init_swarm_splits.py
