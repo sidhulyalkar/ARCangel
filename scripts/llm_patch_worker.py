@@ -207,7 +207,7 @@ def main() -> int:
     ap.add_argument("--proposal", required=True)
     ap.add_argument("--worktree", default=".")
     ap.add_argument("--providers", default="configs/research-providers.nvidia-swarm.json")
-    ap.add_argument("--provider", default="nvidia-deepseek-v4-pro")
+    ap.add_argument("--provider", default="nvidia-laguna-xs21")
     ap.add_argument("--max-context-chars", type=int, default=90000)
     ap.add_argument("--max-tokens", type=int, default=6000)
     ap.add_argument("--repair-attempts", type=int, default=2)
