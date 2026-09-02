@@ -1,0 +1,28 @@
+{
+  "workers": [
+    {
+      "id": "nvidia-deepseek-patch-worker",
+      "command": [
+        "python",
+        "scripts/llm_patch_worker.py",
+        "--proposal",
+        "{proposal}",
+        "--worktree",
+        "{worktree}",
+        "--providers",
+        "configs/research-providers.nvidia-swarm.json",
+        "--provider",
+        "nvidia-deepseek-v4-pro",
+        "--repair-attempts",
+        "2"
+      ],
+      "qualification_commands": [
+        ["python", "-m", "compileall", "-q", "src/arc3lab"],
+        ["python", "-m", "pytest", "-q"]
+      ],
+      "roles": [],
+      "timeout_seconds": 7200,
+      "enabled": true
+    }
+  ]
+}
