@@ -65,8 +65,7 @@ def _probe_once(row: dict[str, Any], timeout: float) -> dict[str, Any]:
                 "elapsed_seconds": elapsed,
                 "detail": text,
             }
-        payload = response.json()
-        text = extract_message_text(payload)
+        text = extract_message_text(response.json())
         return {
             "provider_id": provider_id,
             "model": model,
@@ -118,19 +117,45 @@ def _probe(row: dict[str, Any], timeout: float, attempts: int) -> dict[str, Any]
     return result
 
 
+def classify_health(
+    results: list[dict[str, Any]],
+    *,
+    min_healthy: int,
+    required_providers: set[str],
+) -> tuple[str, list[str]]:
+    healthy = {str(row["provider_id"]) for row in results if bool(row.get("ok"))}
+    missing_required = sorted(required_providers - healthy)
+    if missing_required or len(healthy) < max(1, int(min_healthy)):
+        return "UNHEALTHY", missing_required
+    if len(healthy) < len(results):
+        return "DEGRADED", missing_required
+    return "HEALTHY", missing_required
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Probe enabled ARCangel research LLM endpoints cheaply")
+    ap = argparse.ArgumentParser(description="Probe ARCangel research endpoints and build active quorum")
     ap.add_argument("--providers", default="configs/research-providers.nvidia-swarm.json")
     ap.add_argument("--timeout", type=float, default=45.0)
     ap.add_argument("--attempts", type=int, default=2)
     ap.add_argument("--max-workers", type=int, default=4)
+    ap.add_argument("--min-healthy", type=int, default=1)
+    ap.add_argument("--require-provider", action="append", default=[])
     ap.add_argument("--output", default="")
+    ap.add_argument("--active-output", default="")
     args = ap.parse_args()
 
     payload = json.loads(Path(args.providers).read_text(encoding="utf-8"))
     providers = [dict(row) for row in payload.get("providers", []) if bool(row.get("enabled", True))]
     if not providers:
         raise ValueError("provider config contains no enabled research endpoints")
+    known_ids = {str(row.get("id", "")) for row in providers}
+    required = {str(value) for value in args.require_provider}
+    unknown_required = sorted(required - known_ids)
+    if unknown_required:
+        raise ValueError(f"required provider ids are not enabled: {unknown_required}")
+    if not 1 <= int(args.min_healthy) <= len(providers):
+        raise ValueError("--min-healthy must be between 1 and enabled provider count")
+
     results: list[dict[str, Any]] = []
     with ThreadPoolExecutor(max_workers=max(1, min(args.max_workers, len(providers)))) as executor:
         futures = {
@@ -140,18 +165,51 @@ def main() -> int:
         for future in as_completed(futures):
             results.append(future.result())
     results.sort(key=lambda row: str(row["provider_id"]))
+
+    status, missing_required = classify_health(
+        results,
+        min_healthy=int(args.min_healthy),
+        required_providers=required,
+    )
+    healthy_ids = {str(row["provider_id"]) for row in results if bool(row.get("ok"))}
+    active_providers = [row for row in providers if str(row.get("id", "")) in healthy_ids]
     summary = {
-        "status": "HEALTHY" if all(row["ok"] for row in results) else "UNHEALTHY",
+        "status": status,
         "enabled": len(results),
-        "healthy": sum(bool(row["ok"]) for row in results),
+        "healthy": len(active_providers),
+        "healthy_provider_ids": sorted(healthy_ids),
+        "unhealthy_provider_ids": sorted(known_ids - healthy_ids),
+        "min_healthy": int(args.min_healthy),
+        "required_provider_ids": sorted(required),
+        "missing_required_provider_ids": missing_required,
+        "research_quorum_met": status in {"HEALTHY", "DEGRADED"},
         "providers": results,
     }
     if args.output:
         output = Path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    if args.active_output:
+        active = Path(args.active_output)
+        active.parent.mkdir(parents=True, exist_ok=True)
+        active.write_text(
+            json.dumps(
+                {
+                    "providers": active_providers,
+                    "source": args.providers,
+                    "health_status": status,
+                    "research_quorum": {
+                        "min_healthy": int(args.min_healthy),
+                        "required_provider_ids": sorted(required),
+                    },
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     print(json.dumps(summary, indent=2))
-    return 0 if summary["status"] == "HEALTHY" else 2
+    return 0 if summary["research_quorum_met"] else 2
 
 
 if __name__ == "__main__":
