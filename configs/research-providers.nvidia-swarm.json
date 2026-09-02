@@ -21,9 +21,9 @@
       "enabled": true
     },
     {
-      "id": "nvidia-glm52",
+      "id": "nvidia-kimi-k3",
       "base_url": "https://integrate.api.nvidia.com/v1",
-      "model": "z-ai/glm-5.2",
+      "model": "moonshotai/kimi-k3",
       "api_key_env": "NVIDIA_API_KEY",
       "roles": ["explorer", "vision", "red_team"],
       "max_tokens": 4000,
