@@ -36,6 +36,8 @@ on:
       - 'scripts/run_v013_candidate.py'
       - 'scripts/build_v013_candidate_notebook.py'
       - 'scripts/verify_v013_candidate_notebook.py'
+      - 'scripts/build_v013_tournament_notebook.py'
+      - 'scripts/verify_v013_tournament_notebook.py'
       - 'scripts/package_kaggle_ready.py'
       - 'configs/swarm-v013.json'
       - 'configs/swarm-packet-files.txt'
@@ -79,6 +81,8 @@ on:
       - 'scripts/run_v013_candidate.py'
       - 'scripts/build_v013_candidate_notebook.py'
       - 'scripts/verify_v013_candidate_notebook.py'
+      - 'scripts/build_v013_tournament_notebook.py'
+      - 'scripts/verify_v013_tournament_notebook.py'
       - 'scripts/package_kaggle_ready.py'
       - 'configs/swarm-v013.json'
       - 'configs/swarm-packet-files.txt'
@@ -144,6 +148,8 @@ jobs:
           scripts/run_v013_candidate.py
           scripts/build_v013_candidate_notebook.py
           scripts/verify_v013_candidate_notebook.py
+          scripts/build_v013_tournament_notebook.py
+          scripts/verify_v013_tournament_notebook.py
           scripts/package_kaggle_ready.py
           tests/test_v013_*.py
       - run: >-
@@ -181,6 +187,8 @@ jobs:
           scripts/run_v013_candidate.py
           scripts/build_v013_candidate_notebook.py
           scripts/verify_v013_candidate_notebook.py
+          scripts/build_v013_tournament_notebook.py
+          scripts/verify_v013_tournament_notebook.py
           scripts/package_kaggle_ready.py
       - run: >-
           python scripts/build_v013_candidate_notebook.py
@@ -194,3 +202,11 @@ jobs:
           --profile v012-lite
           --contestant-id E-v012-lite
           --build-id CI-V013-E
+      - run: >-
+          python scripts/build_v013_tournament_notebook.py
+          --build-id CI-V013-TOURNAMENT
+          --output /tmp/arcangel-v013-tournament.ipynb
+      - run: >-
+          python scripts/verify_v013_tournament_notebook.py
+          /tmp/arcangel-v013-tournament.ipynb
+          --build-id CI-V013-TOURNAMENT
