@@ -137,18 +137,21 @@ jobs:
           print(json.dumps(receipt, indent=2))
           PY
 
-      - name: Probe heterogeneous NVIDIA endpoints
+      - name: Probe NVIDIA research quorum
         id: providers
         run: >-
           python scripts/check_research_providers.py
           --providers configs/research-providers.nvidia-swarm.json
+          --min-healthy 2
+          --require-provider nvidia-laguna-xs21
           --output artifacts/arena/v013/provider-health.json
+          --active-output artifacts/arena/v013/research-providers.active.json
 
       - name: Run independent swarm and blinded council
         id: council
         run: >-
           python scripts/run_swarm_research_cycle.py
-          --providers configs/research-providers.nvidia-swarm.json
+          --providers artifacts/arena/v013/research-providers.active.json
           --manifest configs/swarm-v013.json
           --arena-root artifacts/arena/v013
           --repo-root .
@@ -205,6 +208,7 @@ jobs:
           path: |
             artifacts/arena/v013/research-launch.json
             artifacts/arena/v013/provider-health.json
+            artifacts/arena/v013/research-providers.active.json
             artifacts/arena/v013/proposals/generation-${{ steps.params.outputs.generation }}/
             artifacts/arena/v013/reviews/generation-${{ steps.params.outputs.generation }}/
             artifacts/arena/v013/swarm-battle-generation-${{ steps.params.outputs.generation }}.json
@@ -229,6 +233,7 @@ jobs:
           generation = os.environ.get('GENERATION', '')
           credential_alias = os.environ.get('CREDENTIAL_ALIAS', '')
           health = Path('artifacts/arena/v013/provider-health.json')
+          active = Path('artifacts/arena/v013/research-providers.active.json')
           battle = Path(f'artifacts/arena/v013/swarm-battle-generation-{generation}.json')
           portable = Path(f'artifacts/arena/v013/portable-patches/generation-{generation}/manifest.json')
           problems = []
@@ -236,8 +241,10 @@ jobs:
               problems.append('generation parameters were not resolved')
           if credential_alias in {'', 'NONE', 'UNRESOLVED'}:
               problems.append('no supported NVIDIA Actions secret is visible to ARCangel')
-          if not health.exists() or json.loads(health.read_text()).get('status') != 'HEALTHY':
-              problems.append('heterogeneous provider health gate did not pass')
+          if not health.exists() or not json.loads(health.read_text()).get('research_quorum_met'):
+              problems.append('NVIDIA research quorum did not pass')
+          if not active.exists() or len(json.loads(active.read_text()).get('providers', [])) < 2:
+              problems.append('active research provider manifest has fewer than two families')
           if not battle.exists() or int(json.loads(battle.read_text()).get('selected_count', 0)) < 1:
               problems.append('council produced no selected experiment')
           if not portable.exists() or int(json.loads(portable.read_text()).get('exported_count', 0)) < 1:
