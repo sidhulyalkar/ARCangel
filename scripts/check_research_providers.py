@@ -11,8 +11,13 @@ from typing import Any
 
 import requests
 
+from arc3lab.arena.provider_transport import build_chat_payload, extract_message_text
 
-def _probe(row: dict[str, Any], timeout: float) -> dict[str, Any]:
+
+_RETRYABLE = {"timeout", "rate_limited", "server_error"}
+
+
+def _probe_once(row: dict[str, Any], timeout: float) -> dict[str, Any]:
     provider_id = str(row.get("id", ""))
     model = str(row.get("model", ""))
     env_name = str(row.get("api_key_env", ""))
@@ -30,12 +35,12 @@ def _probe(row: dict[str, Any], timeout: float) -> dict[str, Any]:
         response = requests.post(
             f"{str(row['base_url']).rstrip('/')}/chat/completions",
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": "Reply with OK."}],
-                "temperature": 0.0,
-                "max_tokens": 16,
-            },
+            json=build_chat_payload(
+                row,
+                messages=({"role": "user", "content": "Reply with OK."},),
+                temperature=0.0,
+                max_tokens=32,
+            ),
             timeout=timeout,
         )
         elapsed = round(time.monotonic() - started, 3)
@@ -49,6 +54,8 @@ def _probe(row: dict[str, Any], timeout: float) -> dict[str, Any]:
                 classification = "model_unavailable"
             elif response.status_code == 429:
                 classification = "rate_limited"
+            elif response.status_code >= 500:
+                classification = "server_error"
             return {
                 "provider_id": provider_id,
                 "model": model,
@@ -59,24 +66,14 @@ def _probe(row: dict[str, Any], timeout: float) -> dict[str, Any]:
                 "detail": text,
             }
         payload = response.json()
-        choices = payload.get("choices") or []
-        if not choices:
-            return {
-                "provider_id": provider_id,
-                "model": model,
-                "ok": False,
-                "classification": "malformed_response",
-                "elapsed_seconds": elapsed,
-                "detail": "response has no choices",
-            }
-        content = str((choices[0].get("message") or {}).get("content", ""))
+        text = extract_message_text(payload)
         return {
             "provider_id": provider_id,
             "model": model,
             "ok": True,
             "classification": "healthy",
             "elapsed_seconds": elapsed,
-            "response_preview": content[:200],
+            "response_preview": text[:200],
         }
     except requests.Timeout as exc:
         return {
@@ -96,10 +93,36 @@ def _probe(row: dict[str, Any], timeout: float) -> dict[str, Any]:
         }
 
 
+def _probe(row: dict[str, Any], timeout: float, attempts: int) -> dict[str, Any]:
+    effective_timeout = max(5.0, float(row.get("health_timeout_seconds", timeout)))
+    history: list[dict[str, Any]] = []
+    for attempt in range(1, max(1, attempts) + 1):
+        result = _probe_once(row, effective_timeout)
+        history.append(
+            {
+                "attempt": attempt,
+                "ok": bool(result.get("ok")),
+                "classification": result.get("classification"),
+                "elapsed_seconds": result.get("elapsed_seconds"),
+            }
+        )
+        if result.get("ok"):
+            result["attempts"] = history
+            return result
+        if str(result.get("classification")) not in _RETRYABLE:
+            result["attempts"] = history
+            return result
+        if attempt < attempts:
+            time.sleep(1.0)
+    result["attempts"] = history
+    return result
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Probe enabled ARCangel research LLM endpoints cheaply")
     ap.add_argument("--providers", default="configs/research-providers.nvidia-swarm.json")
     ap.add_argument("--timeout", type=float, default=45.0)
+    ap.add_argument("--attempts", type=int, default=2)
     ap.add_argument("--max-workers", type=int, default=4)
     ap.add_argument("--output", default="")
     args = ap.parse_args()
@@ -110,7 +133,10 @@ def main() -> int:
         raise ValueError("provider config contains no enabled research endpoints")
     results: list[dict[str, Any]] = []
     with ThreadPoolExecutor(max_workers=max(1, min(args.max_workers, len(providers)))) as executor:
-        futures = {executor.submit(_probe, row, args.timeout): row for row in providers}
+        futures = {
+            executor.submit(_probe, row, args.timeout, max(1, int(args.attempts))): row
+            for row in providers
+        }
         for future in as_completed(futures):
             results.append(future.result())
     results.sort(key=lambda row: str(row["provider_id"]))
