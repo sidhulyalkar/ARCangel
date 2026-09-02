@@ -12,6 +12,8 @@ from typing import Any
 
 import requests
 
+from arc3lab.arena.schema import ArenaManifest
+
 
 def _run(command: list[str], *, cwd: Path | None = None) -> None:
     print("AUTONOMOUS SWARM EXEC:", " ".join(command), flush=True)
@@ -178,10 +180,14 @@ def main() -> int:
     ap.add_argument("--max-experiments", type=int, default=4)
     ap.add_argument("--dev-screen-seeds", type=int, default=1)
     ap.add_argument("--validation-seeds", type=int, default=2)
-    ap.add_argument("--dev-screen-delta", type=float, default=-0.01)
+    ap.add_argument("--dev-screen-delta", type=float, default=None)
     args = ap.parse_args()
 
     generation = max(1, int(args.generation))
+    manifest = ArenaManifest.load(args.manifest)
+    rules = manifest.promotion
+    dev_screen_delta = rules.min_dev_delta if args.dev_screen_delta is None else args.dev_screen_delta
+    validation_seeds = max(rules.min_validation_runs, int(args.validation_seeds), 2)
     arena = Path(args.arena_root)
     battle = arena / f"swarm-battle-generation-{generation}.json"
     receipt_root = Path(args.receipt_root)
@@ -203,6 +209,13 @@ def main() -> int:
             str(generation),
         ]
     )
+    payload = json.loads(battle.read_text())
+    selected = list(payload.get("selected", []))[: max(0, int(args.max_experiments))]
+    worker_battle = arena / f"swarm-worker-generation-{generation}.json"
+    worker_payload = dict(payload)
+    worker_payload["selected"] = selected
+    worker_payload["selected_count"] = len(selected)
+    worker_battle.write_text(json.dumps(worker_payload, indent=2) + "\n")
     _run(
         [
             sys.executable,
@@ -210,7 +223,7 @@ def main() -> int:
             "--workers",
             args.workers_config,
             "--battle-plan",
-            str(battle),
+            str(worker_battle),
             "--repo-root",
             args.repo_root,
             "--worktree-root",
@@ -222,8 +235,6 @@ def main() -> int:
         ]
     )
 
-    payload = json.loads(battle.read_text())
-    selected = list(payload.get("selected", []))[: max(0, int(args.max_experiments))]
     qualified = []
     for row in selected:
         proposal_id = str(row["proposal_id"])
@@ -276,10 +287,11 @@ def main() -> int:
                 "promoted": False,
             }
             healthy = (
-                float(dev_fitness.get("candidate_failure_rate", 1.0)) <= 0.05
-                and float(dev_fitness.get("candidate_emergency_fraction", 1.0)) <= 0.02
+                float(dev_fitness.get("candidate_failure_rate", 1.0)) <= rules.max_failure_rate
+                and float(dev_fitness.get("candidate_emergency_fraction", 1.0))
+                <= rules.max_emergency_fraction
             )
-            if float(dev_fitness.get("robust_delta", -1e9)) < args.dev_screen_delta or not healthy:
+            if float(dev_fitness.get("robust_delta", -1e9)) < dev_screen_delta or not healthy:
                 experiments.append(row_summary)
                 continue
 
@@ -294,7 +306,7 @@ def main() -> int:
                     battle=validation_battle,
                     proposal_id=proposal_id,
                     worktree=worktree,
-                    max_seeds=max(2, int(args.validation_seeds)),
+                    max_seeds=validation_seeds,
                 )
             )
             validation_receipt = proposal_root / "fitness-receipt.json"
@@ -303,7 +315,8 @@ def main() -> int:
             row_summary["validation_fitness"] = validation_fitness
             if (
                 validation_fitness.get("memory_status") == "measured"
-                and float(validation_fitness.get("robust_delta", -1e9)) >= 0.02
+                and float(validation_fitness.get("robust_delta", -1e9))
+                >= rules.min_validation_delta
             ):
                 promote = [
                     sys.executable,
@@ -339,6 +352,13 @@ def main() -> int:
         "status": "COMPLETE",
         "selected": len(selected),
         "software_qualified": len(qualified),
+        "manifest_thresholds": {
+            "dev_screen_delta": dev_screen_delta,
+            "validation_delta": rules.min_validation_delta,
+            "max_failure_rate": rules.max_failure_rate,
+            "max_emergency_fraction": rules.max_emergency_fraction,
+            "validation_runs": validation_seeds,
+        },
         "experiments": experiments,
         "promotions": promotions,
         "promotion_count": len(promotions),
