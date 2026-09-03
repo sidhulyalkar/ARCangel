@@ -96,6 +96,7 @@ def main() -> int:
     ap.add_argument("--result", default=os.getenv("ARCANGEL_RESULT_PATH", "arena_result.json"))
     ap.add_argument("--suite-output", default="")
     ap.add_argument("--split-registry", default=os.getenv("ARCANGEL_SPLIT_REGISTRY", ""))
+    ap.add_argument("--environments-dir", default=os.getenv("ENVIRONMENTS_DIR", ""))
     ap.add_argument(
         "--base-url",
         default=os.getenv("ARC3_MODEL_BASE_URL", "http://127.0.0.1:8000/v1"),
@@ -118,8 +119,14 @@ def main() -> int:
     if args.split == "blind" and not args.split_registry:
         raise ValueError("blind evaluation requires an explicit private split registry")
 
-    os.environ.setdefault("OPERATION_MODE", "competition")
+    from arc3lab.arena.offline_runtime import configure_offline_environment
+
+    environment_dir = configure_offline_environment(
+        args.environments_dir or None,
+        recordings_dir=Path(args.result).parent / "recordings",
+    )
     os.environ.setdefault("OMP_NUM_THREADS", "1")
+    print(f"ARCANGEL ARENA OFFLINE ENVIRONMENTS: {environment_dir}", flush=True)
 
     from arc3lab.evaluation.runner import run_suite
 
@@ -144,6 +151,8 @@ def main() -> int:
         source=suite_output,
     )
     result.metadata["runtime_budget"] = payload.get("runtime_budget", {})
+    result.metadata["operation_mode"] = "OFFLINE"
+    result.metadata["environments_dir"] = str(environment_dir)
     Path(args.result).parent.mkdir(parents=True, exist_ok=True)
     Path(args.result).write_text(json.dumps(result.to_dict(), indent=2) + "\n")
     print(json.dumps(result.to_dict(), indent=2))
