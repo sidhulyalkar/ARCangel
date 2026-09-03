@@ -25,7 +25,7 @@ def _contains_games(path: Path) -> bool:
 def _candidate_paths(explicit: str | Path | None = None) -> Iterable[Path]:
     seen: set[str] = set()
 
-    def emit(path: Path):
+    def emit(path: Path) -> Path | None:
         key = str(path.expanduser().resolve(strict=False))
         if key in seen:
             return None
@@ -89,7 +89,7 @@ def configure_offline_environment(
     os.environ["OPERATION_MODE"] = "OFFLINE"
     os.environ["ENVIRONMENTS_DIR"] = str(environment_dir)
     if recordings_dir is not None:
-        os.environ["RECORDINGS_DIR"] = str(Path(recordings_dir))
+        os.environ["RECORDINGS_DIR"] = str(Path(recordings_dir).resolve(strict=False))
     return environment_dir
 
 
@@ -106,8 +106,10 @@ def open_offline_arcade(
     )
     from arc_agi import Arcade, OperationMode
 
-    return Arcade(
-        operation_mode=OperationMode.OFFLINE,
-        environments_dir=str(environment_dir),
-        recordings_dir=(str(recordings_dir) if recordings_dir is not None else None),
-    )
+    kwargs = {
+        "operation_mode": OperationMode.OFFLINE,
+        "environments_dir": str(environment_dir),
+    }
+    if recordings_dir is not None:
+        kwargs["recordings_dir"] = str(Path(recordings_dir).resolve(strict=False))
+    return Arcade(**kwargs)
