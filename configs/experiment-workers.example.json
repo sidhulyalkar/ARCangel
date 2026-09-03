@@ -1,0 +1,22 @@
+{
+  "workers": [
+    {
+      "id": "frontier-coding-agent",
+      "command": [
+        "REPLACE_WITH_CODING_AGENT_BINARY",
+        "REPLACE_WITH_NONINTERACTIVE_SUBCOMMAND",
+        "--proposal",
+        "{proposal}",
+        "--worktree",
+        "{worktree}"
+      ],
+      "qualification_commands": [
+        ["python", "-m", "pytest", "-q"],
+        ["python", "-m", "ruff", "check", "src", "scripts", "tests"]
+      ],
+      "roles": [],
+      "timeout_seconds": 7200,
+      "enabled": false
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "workers": [
+    {
+      "id": "nvidia-laguna-patch-worker",
+      "command": [
+        "python",
+        "scripts/retrying_llm_patch_worker.py",
+        "--transient-attempts",
+        "3",
+        "--retry-backoff-seconds",
+        "3",
+        "--proposal",
+        "{proposal}",
+        "--worktree",
+        "{worktree}",
+        "--providers",
+        "configs/research-providers.nvidia-swarm.json",
+        "--provider",
+        "nvidia-laguna-xs21",
+        "--max-context-chars",
+        "42000",
+        "--max-tokens",
+        "3400",
+        "--repair-attempts",
+        "1"
+      ],
+      "qualification_commands": [
+        ["python", "-m", "compileall", "-q", "src/arc3lab"],
+        ["python", "-m", "pytest", "-q"]
+      ],
+      "roles": [],
+      "timeout_seconds": 7200,
+      "enabled": true
+    }
+  ]
+}

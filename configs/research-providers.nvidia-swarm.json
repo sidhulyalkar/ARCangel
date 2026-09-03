@@ -1,0 +1,50 @@
+{
+  "providers": [
+    {
+      "id": "nvidia-nemotron35-lightning",
+      "base_url": "https://integrate.api.nvidia.com/v1",
+      "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "api_key_env": "NVIDIA_API_KEY",
+      "roles": ["minimalist", "runtime", "integrator"],
+      "max_tokens": 3000,
+      "timeout_seconds": 600,
+      "health_timeout_seconds": 60,
+      "request_body": {
+        "top_p": 0.95,
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "nvidia-laguna-xs21",
+      "base_url": "https://integrate.api.nvidia.com/v1",
+      "model": "poolside/laguna-xs-2.1",
+      "api_key_env": "NVIDIA_API_KEY",
+      "roles": ["scientist", "planner", "memory", "generalization"],
+      "max_tokens": 4000,
+      "timeout_seconds": 600,
+      "health_timeout_seconds": 60,
+      "request_body": {
+        "top_p": 0.95
+      },
+      "enabled": true
+    },
+    {
+      "id": "nvidia-kimi-k3",
+      "base_url": "https://integrate.api.nvidia.com/v1",
+      "model": "moonshotai/kimi-k3",
+      "api_key_env": "NVIDIA_API_KEY",
+      "roles": ["explorer", "vision", "red_team"],
+      "max_tokens": 5000,
+      "timeout_seconds": 600,
+      "health_timeout_seconds": 90,
+      "request_body": {
+        "top_p": 0.95,
+        "reasoning_effort": "low"
+      },
+      "enabled": true
+    }
+  ]
+}

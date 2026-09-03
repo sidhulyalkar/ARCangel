@@ -1,0 +1,132 @@
+{
+  "experiment_id": "V013-AUTONOMOUS-RESEARCH-SWARM-20260831",
+  "seeds": [20260831, 20260901, 20260902],
+  "timeout_seconds": 7200,
+  "max_parallel": 1,
+  "split_salt": "set-with-ARCANGEL_SPLIT_SALT-not-public-default",
+  "leaderboard_control_id": "A-duck-qwen38-public",
+  "min_leaderboard_delta": 0.0,
+  "min_leaderboard_candidate_runs": 2,
+  "min_leaderboard_control_runs": 2,
+  "leaderboard_confidence_se": 1.0,
+  "require_leaderboard_artifact_hash": true,
+  "weights": {
+    "solve_rate": 0.30,
+    "level_rate": 0.19,
+    "action_efficiency": 0.16,
+    "model_efficiency": 0.09,
+    "prediction_accuracy": 0.09,
+    "falsification_health": 0.05,
+    "stability": 0.12
+  },
+  "promotion": {
+    "min_validation_delta": 0.02,
+    "min_dev_delta": -0.01,
+    "min_blind_delta": -0.01,
+    "max_emergency_fraction": 0.02,
+    "max_failure_rate": 0.05,
+    "min_validation_runs": 2,
+    "min_blind_runs": 2,
+    "require_control": true
+  },
+  "contestants": [
+    {
+      "id": "A-duck-qwen38-public",
+      "family": "duck",
+      "role": "external leaderboard control",
+      "description": "Exact public Duck + Qwen3.8 Copy & Edit control. Results are imported from Kaggle, never reconstructed by ARCangel.",
+      "enabled": false,
+      "tags": ["control", "external", "qwen38"]
+    },
+    {
+      "id": "B-coding-minimal",
+      "family": "coding",
+      "role": "minimalist control",
+      "description": "ARCangel's thinnest existing coding-agent lane. Internal control for architecture additions.",
+      "command": ["python", "scripts/run_arena_contestant.py", "--profile", "coding-minimal", "--contestant", "{contestant}", "--split", "{split}", "--seed", "{seed}", "--result", "{result}", "--split-registry", "artifacts/arena/v013/splits.public.json", "--workers", "8", "--time-budget-seconds", "3600", "--game-time-budget-seconds", "900", "--coverage-reserve-fraction", "0.05"],
+      "judge_command": ["python", "scripts/run_arena_contestant.py", "--profile", "coding-minimal", "--contestant", "{contestant}", "--split", "blind", "--seed", "{seed}", "--result", "{result}", "--split-registry", "{private_registry}", "--workers", "8", "--time-budget-seconds", "3600", "--game-time-budget-seconds", "900", "--coverage-reserve-fraction", "0.05"],
+      "enabled": true,
+      "tags": ["control", "minimal", "model-led"]
+    },
+    {
+      "id": "C-v011-reflective",
+      "family": "v011",
+      "role": "historical falsified lineage control",
+      "description": "Preserves the S190A controller family as a negative control rather than deleting its evidence.",
+      "control_id": "B-coding-minimal",
+      "command": ["python", "scripts/run_arena_contestant.py", "--profile", "v011", "--contestant", "{contestant}", "--split", "{split}", "--seed", "{seed}", "--result", "{result}", "--split-registry", "artifacts/arena/v013/splits.public.json", "--workers", "8", "--time-budget-seconds", "3600", "--game-time-budget-seconds", "900", "--coverage-reserve-fraction", "0.05"],
+      "judge_command": ["python", "scripts/run_arena_contestant.py", "--profile", "v011", "--contestant", "{contestant}", "--split", "blind", "--seed", "{seed}", "--result", "{result}", "--split-registry", "{private_registry}", "--workers", "8", "--time-budget-seconds", "3600", "--game-time-budget-seconds", "900", "--coverage-reserve-fraction", "0.05"],
+      "enabled": true,
+      "tags": ["negative-control", "v011"]
+    },
+    {
+      "id": "D-v012-evidence-first",
+      "family": "v012",
+      "role": "scientist",
+      "description": "Full evidence-first coding agent with falsification-tested plans and expectation checking.",
+      "control_id": "B-coding-minimal",
+      "command": ["python", "scripts/run_arena_contestant.py", "--profile", "v012", "--contestant", "{contestant}", "--split", "{split}", "--seed", "{seed}", "--result", "{result}", "--split-registry", "artifacts/arena/v013/splits.public.json", "--workers", "8", "--time-budget-seconds", "3600", "--game-time-budget-seconds", "900", "--coverage-reserve-fraction", "0.05"],
+      "judge_command": ["python", "scripts/run_arena_contestant.py", "--profile", "v012", "--contestant", "{contestant}", "--split", "blind", "--seed", "{seed}", "--result", "{result}", "--split-registry", "{private_registry}", "--workers", "8", "--time-budget-seconds", "3600", "--game-time-budget-seconds", "900", "--coverage-reserve-fraction", "0.05"],
+      "enabled": true,
+      "tags": ["evidence", "falsification", "world-model"]
+    },
+    {
+      "id": "E-v012-lite",
+      "family": "v012-lite",
+      "role": "minimalist",
+      "description": "Ablates V012 reasoning/tool/plan capacity to test whether the evidence-first idea survives simplification.",
+      "parent": "D-v012-evidence-first",
+      "control_id": "B-coding-minimal",
+      "command": ["python", "scripts/run_arena_contestant.py", "--profile", "v012-lite", "--contestant", "{contestant}", "--split", "{split}", "--seed", "{seed}", "--result", "{result}", "--split-registry", "artifacts/arena/v013/splits.public.json", "--workers", "8", "--time-budget-seconds", "3600", "--game-time-budget-seconds", "900", "--coverage-reserve-fraction", "0.05"],
+      "judge_command": ["python", "scripts/run_arena_contestant.py", "--profile", "v012-lite", "--contestant", "{contestant}", "--split", "blind", "--seed", "{seed}", "--result", "{result}", "--split-registry", "{private_registry}", "--workers", "8", "--time-budget-seconds", "3600", "--game-time-budget-seconds", "900", "--coverage-reserve-fraction", "0.05"],
+      "enabled": true,
+      "tags": ["ablation", "evidence", "minimal"]
+    },
+    {
+      "id": "F-duck-memory",
+      "family": "duck-memory",
+      "role": "memory specialist",
+      "description": "Planned challenger: Duck-style control plus exact evidence retrieval and aggressive working-context eviction.",
+      "parent": "A-duck-qwen38-public",
+      "control_id": "B-coding-minimal",
+      "enabled": false,
+      "tags": ["planned", "memory"]
+    },
+    {
+      "id": "G-adaptive-representation",
+      "family": "adaptive-representation",
+      "role": "vision specialist",
+      "description": "Planned challenger: model chooses raw grid, image, delta, component, or temporal representation on demand.",
+      "control_id": "B-coding-minimal",
+      "enabled": false,
+      "tags": ["planned", "vision", "representation"]
+    },
+    {
+      "id": "H-executable-world-model",
+      "family": "world-model",
+      "role": "planner",
+      "description": "Planned challenger: escalate to executable transition modeling only after direct reasoning stalls.",
+      "control_id": "B-coding-minimal",
+      "enabled": false,
+      "tags": ["planned", "planning", "world-model"]
+    },
+    {
+      "id": "I-information-gain-explorer",
+      "family": "exploration",
+      "role": "game theorist",
+      "description": "Planned challenger: score live probes by expected discrimination among current causal hypotheses.",
+      "control_id": "B-coding-minimal",
+      "enabled": false,
+      "tags": ["planned", "exploration", "causal"]
+    },
+    {
+      "id": "J-sparse-debate",
+      "family": "debate",
+      "role": "red-team judge",
+      "description": "Planned challenger: invoke proposal/skeptic/judge only at pivotal high-uncertainty states.",
+      "control_id": "B-coding-minimal",
+      "enabled": false,
+      "tags": ["planned", "debate", "adaptive-compute"]
+    }
+  ]
+}

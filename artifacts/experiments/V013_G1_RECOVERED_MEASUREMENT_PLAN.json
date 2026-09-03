@@ -1,0 +1,74 @@
+{
+  "format": "arcangel-swarm-existing-profile-measurement-plan-v1",
+  "phase": "swarm-existing-profile-measurements",
+  "generation": 1,
+  "source_research_run": 33602324667,
+  "source_research_head": "4e428a19f5fa96a839fd41ec1910eacc20e188ef",
+  "source_artifact_id": 9836407054,
+  "source_artifact_digest": "sha256:4792b98df7af7ae0a6663214e19baf7287af1686c7ab6ff20c527c89074b1607",
+  "source_provider_quorum": {
+    "status": "HEALTHY",
+    "healthy": 3,
+    "enabled": 3,
+    "providers": [
+      "nvidia-kimi-k3",
+      "nvidia-laguna-xs21",
+      "nvidia-nemotron35-lightning"
+    ]
+  },
+  "source_generation_summary": {
+    "requested_proposals": 10,
+    "valid_proposals": 8,
+    "reviews": 9,
+    "valid_reviews": 7,
+    "council_selected": 3,
+    "deduplicated_measurements": 2,
+    "coding_workers_required_for_these_measurements": 0
+  },
+  "selected_count": 2,
+  "selected": [
+    {
+      "proposal_id": "G1-SWARM-01-planner-nvidia-laguna-xs21",
+      "source_proposal_ids": [
+        "G1-SWARM-01-planner-nvidia-laguna-xs21",
+        "G1-SWARM-02-runtime-nvidia-nemotron35-lightning"
+      ],
+      "provider_id": "nvidia-laguna-xs21",
+      "role_id": "planner",
+      "hypothesis": "Evidence-first reasoning with complete immutable ledger authority beats semantic arbitration when the agent must discover agency, mechanics, and goals from scratch without pre-structured action candidates.",
+      "deduplicated_hypotheses": [
+        "V012's evidence-first architecture may introduce unnecessary cognitive overhead that delays agency identification and goal inference; Coding Minimal may therefore be more action-efficient."
+      ],
+      "experiment": "Run Coding Minimal and V012 Evidence First on identical DEV/VALIDATION splits and seeds. This single paired comparison discriminates between the independently selected evidence-first and minimal-runtime hypotheses.",
+      "target_metric": "robust paired utility plus action efficiency, model efficiency, failure rate, emergency fraction, and timeout fraction",
+      "selection_split": "dev",
+      "falsifier": "V012 fails to achieve the predeclared robust paired improvement over Coding Minimal on repeated VALIDATION, or gains outcome score only by unacceptable action/model/runtime cost.",
+      "implementation": "No cognition patch is required. Measure the existing v012 and coding-minimal profiles from the same qualified code snapshot.",
+      "failure_mode": "If both profiles fail similarly, diagnose model/runtime/control reproduction before drawing an architecture conclusion.",
+      "target_profile": "v012",
+      "control_profile": "coding-minimal",
+      "experiment_kind": "existing_profile_comparison",
+      "generation": 1
+    },
+    {
+      "proposal_id": "G1-SWARM-03-memory-nvidia-laguna-xs21",
+      "source_proposal_ids": [
+        "G1-SWARM-03-memory-nvidia-laguna-xs21"
+      ],
+      "provider_id": "nvidia-laguna-xs21",
+      "role_id": "memory",
+      "hypothesis": "Long-horizon retrieval succeeds when the agent maintains exact queryable evidence and uses it to falsify hypotheses before spending real actions, rather than relying on the lighter V012-Lite scaffold.",
+      "experiment": "Compare existing V012 Evidence First against existing V012 Lite on identical DEV/VALIDATION splits and seeds.",
+      "target_metric": "robust paired utility plus prediction accuracy, falsification health, action efficiency, model efficiency, failure rate, emergency fraction, and timeout fraction",
+      "selection_split": "dev",
+      "falsifier": "V012 fails to achieve the predeclared robust paired improvement over V012 Lite on repeated VALIDATION or its gain is dominated by additional runtime/model cost.",
+      "implementation": "No cognition patch is required. Measure the existing v012 and v012-lite profiles from the same qualified code snapshot.",
+      "failure_mode": "If V012 Lite matches V012 within the robust margin, prefer the lighter architecture and move targeted memory mechanisms into isolated mutation experiments.",
+      "target_profile": "v012",
+      "control_profile": "v012-lite",
+      "experiment_kind": "existing_profile_comparison",
+      "generation": 1
+    }
+  ],
+  "authority": "Recovered from immutable Generation 1 research evidence. This file routes existing-profile measurements only; paired Qwen DEV/VALIDATION outcomes decide the architecture question."
+}

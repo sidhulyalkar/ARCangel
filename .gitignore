@@ -9,6 +9,7 @@ runs/
 artifacts/*.jsonl
 artifacts/*.json
 artifacts/*.csv
+artifacts/arena/
 !artifacts/.gitkeep
 *.egg-info/
 dist/

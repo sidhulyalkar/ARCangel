@@ -1,0 +1,281 @@
+name: swarm-research
+
+on:
+  push:
+    branches:
+      - 'agent/v013-autonomous-research-swarm'
+  workflow_dispatch:
+    inputs:
+      generation:
+        description: 'Swarm generation number'
+        required: true
+        default: '1'
+        type: string
+      max_proposals:
+        description: 'Maximum council-selected experiments'
+        required: true
+        default: '4'
+        type: string
+
+concurrency:
+  group: swarm-research-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  nvidia-research-swarm:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '[run-swarm-research]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      NVIDIA_API_KEY_PRIMARY: ${{ secrets.NVIDIA_API_KEY }}
+      NVIDIA_API_KEY_NIM: ${{ secrets.NVIDIA_NIM_API_KEY }}
+      NVIDIA_API_KEY_NGC: ${{ secrets.NGC_API_KEY }}
+      NVIDIA_API_KEY_ALT: ${{ secrets.NVIDIA_KEY }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ARCangel
+        run: python -m pip install -e '.[dev]'
+
+      - name: Resolve generation parameters
+        id: params
+        env:
+          DISPATCH_GENERATION: ${{ inputs.generation }}
+          DISPATCH_MAX_PROPOSALS: ${{ inputs.max_proposals }}
+          EVENT_NAME: ${{ github.event_name }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          if os.environ.get('EVENT_NAME') == 'workflow_dispatch':
+              generation = int(os.environ.get('DISPATCH_GENERATION') or '1')
+              max_proposals = int(os.environ.get('DISPATCH_MAX_PROPOSALS') or '4')
+          else:
+              trigger = Path('.github/swarm-research-trigger.json')
+              if not trigger.exists():
+                  raise SystemExit('push-triggered swarm run requires .github/swarm-research-trigger.json')
+              payload = json.loads(trigger.read_text())
+              generation = int(payload.get('generation', 1))
+              max_proposals = int(payload.get('max_proposals', 4))
+          if generation < 1 or not 1 <= max_proposals <= 8:
+              raise SystemExit('invalid swarm trigger parameters')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as handle:
+              handle.write(f'generation={generation}\n')
+              handle.write(f'max_proposals={max_proposals}\n')
+          print(json.dumps({'generation': generation, 'max_proposals': max_proposals}, indent=2))
+          PY
+
+      - name: Resolve NVIDIA research credential alias
+        id: credential
+        shell: bash
+        run: |
+          if [ -n "$NVIDIA_API_KEY_PRIMARY" ]; then
+            alias='NVIDIA_API_KEY'
+            value="$NVIDIA_API_KEY_PRIMARY"
+          elif [ -n "$NVIDIA_API_KEY_NIM" ]; then
+            alias='NVIDIA_NIM_API_KEY'
+            value="$NVIDIA_API_KEY_NIM"
+          elif [ -n "$NVIDIA_API_KEY_NGC" ]; then
+            alias='NGC_API_KEY'
+            value="$NVIDIA_API_KEY_NGC"
+          elif [ -n "$NVIDIA_API_KEY_ALT" ]; then
+            alias='NVIDIA_KEY'
+            value="$NVIDIA_API_KEY_ALT"
+          else
+            echo 'alias=NONE' >> "$GITHUB_OUTPUT"
+            echo 'No supported NVIDIA Actions secret is visible to this ARCangel workflow.' >&2
+            exit 2
+          fi
+          echo "alias=$alias" >> "$GITHUB_OUTPUT"
+          echo "NVIDIA_API_KEY=$value" >> "$GITHUB_ENV"
+          echo "Using NVIDIA secret alias: $alias"
+
+      - name: Record immutable research base
+        id: base
+        shell: bash
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git status --short
+
+      - name: Record research launch receipt
+        if: always()
+        env:
+          GENERATION: ${{ steps.params.outputs.generation }}
+          MAX_PROPOSALS: ${{ steps.params.outputs.max_proposals }}
+          CREDENTIAL_ALIAS: ${{ steps.credential.outputs.alias }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          receipt = {
+              'generation': int(os.environ.get('GENERATION') or 0),
+              'max_proposals': int(os.environ.get('MAX_PROPOSALS') or 0),
+              'credential_alias': os.environ.get('CREDENTIAL_ALIAS') or 'UNRESOLVED',
+              'credential_value_recorded': False,
+              'research_head': os.environ.get('GITHUB_SHA', ''),
+          }
+          path = Path('artifacts/arena/v013/research-launch.json')
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(receipt, indent=2) + '\n')
+          print(json.dumps(receipt, indent=2))
+          PY
+
+      - name: Probe NVIDIA research quorum
+        id: providers
+        run: >-
+          python scripts/check_research_providers.py
+          --providers configs/research-providers.nvidia-swarm.json
+          --min-healthy 2
+          --require-provider nvidia-laguna-xs21
+          --output artifacts/arena/v013/provider-health.json
+          --active-output artifacts/arena/v013/research-providers.active.json
+
+      - name: Run independent swarm and blinded council
+        id: council
+        run: >-
+          python scripts/run_swarm_research_cycle.py
+          --providers artifacts/arena/v013/research-providers.active.json
+          --manifest configs/swarm-v013.json
+          --arena-root artifacts/arena/v013
+          --repo-root .
+          --generation '${{ steps.params.outputs.generation }}'
+          --max-proposals '${{ steps.params.outputs.max_proposals }}'
+          --max-research-requests 20
+          --max-review-requests 60
+          --reviews-per-proposal 3
+          --min-reviews 2
+          --max-workers 6
+
+      - name: Route measurement and mutation experiments
+        id: routing
+        run: >-
+          python scripts/route_swarm_experiments.py
+          --battle-plan 'artifacts/arena/v013/swarm-battle-generation-${{ steps.params.outputs.generation }}.json'
+          --routed-output 'artifacts/arena/v013/swarm-battle-routed-generation-${{ steps.params.outputs.generation }}.json'
+          --evaluation-output 'artifacts/arena/v013/evaluation-plan-generation-${{ steps.params.outputs.generation }}.json'
+          --mutation-output 'artifacts/arena/v013/mutation-plan-generation-${{ steps.params.outputs.generation }}.json'
+
+      - name: Implement mutation-lane cognition patches
+        id: workers
+        continue-on-error: true
+        run: >-
+          python scripts/run_experiment_workers.py
+          --workers configs/experiment-workers.nvidia.json
+          --battle-plan 'artifacts/arena/v013/mutation-plan-generation-${{ steps.params.outputs.generation }}.json'
+          --repo-root .
+          --worktree-root ../arcangel-experiment-worktrees
+          --receipt-root artifacts/arena/v013/worker-receipts
+          --base-ref '${{ github.sha }}'
+
+      - name: Export cognition-only mutation patches
+        id: patches
+        continue-on-error: true
+        run: >-
+          python scripts/export_swarm_worker_patches.py
+          --battle-plan 'artifacts/arena/v013/mutation-plan-generation-${{ steps.params.outputs.generation }}.json'
+          --base-sha '${{ github.sha }}'
+          --repo-root .
+          --worktree-root ../arcangel-experiment-worktrees
+          --receipt-root artifacts/arena/v013/worker-receipts
+          --output-dir 'artifacts/arena/v013/portable-patches/generation-${{ steps.params.outputs.generation }}'
+
+      - name: Export blind-safe research context receipt
+        if: always()
+        continue-on-error: true
+        run: >-
+          python scripts/export_swarm_context.py
+          --manifest configs/swarm-v013.json
+          --arena-root artifacts/arena/v013
+          --repo-root .
+          --output 'artifacts/arena/v013/swarm-context-generation-${{ steps.params.outputs.generation }}.tar.gz'
+          --receipt 'artifacts/arena/v013/swarm-context-generation-${{ steps.params.outputs.generation }}.json'
+
+      - name: Upload research handoff and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcangel-swarm-generation-${{ steps.params.outputs.generation }}-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            artifacts/arena/v013/research-launch.json
+            artifacts/arena/v013/provider-health.json
+            artifacts/arena/v013/research-providers.active.json
+            artifacts/arena/v013/proposals/generation-${{ steps.params.outputs.generation }}/
+            artifacts/arena/v013/reviews/generation-${{ steps.params.outputs.generation }}/
+            artifacts/arena/v013/swarm-battle-generation-${{ steps.params.outputs.generation }}.json
+            artifacts/arena/v013/swarm-battle-routed-generation-${{ steps.params.outputs.generation }}.json
+            artifacts/arena/v013/evaluation-plan-generation-${{ steps.params.outputs.generation }}.json
+            artifacts/arena/v013/mutation-plan-generation-${{ steps.params.outputs.generation }}.json
+            artifacts/arena/v013/swarm-cycle-generation-${{ steps.params.outputs.generation }}.json
+            artifacts/arena/v013/worker-receipts/
+            artifacts/arena/v013/portable-patches/generation-${{ steps.params.outputs.generation }}/
+            artifacts/arena/v013/swarm-context-generation-${{ steps.params.outputs.generation }}.tar.gz
+            artifacts/arena/v013/swarm-context-generation-${{ steps.params.outputs.generation }}.json
+
+      - name: Qualify research handoff
+        if: always()
+        env:
+          GENERATION: ${{ steps.params.outputs.generation }}
+          CREDENTIAL_ALIAS: ${{ steps.credential.outputs.alias }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          generation = os.environ.get('GENERATION', '')
+          credential_alias = os.environ.get('CREDENTIAL_ALIAS', '')
+          health = Path('artifacts/arena/v013/provider-health.json')
+          active = Path('artifacts/arena/v013/research-providers.active.json')
+          battle = Path(f'artifacts/arena/v013/swarm-battle-generation-{generation}.json')
+          evaluation = Path(f'artifacts/arena/v013/evaluation-plan-generation-{generation}.json')
+          portable = Path(f'artifacts/arena/v013/portable-patches/generation-{generation}/manifest.json')
+          problems = []
+          if not generation:
+              problems.append('generation parameters were not resolved')
+          if credential_alias in {'', 'NONE', 'UNRESOLVED'}:
+              problems.append('no supported NVIDIA Actions secret is visible to ARCangel')
+          if not health.exists() or not json.loads(health.read_text()).get('research_quorum_met'):
+              problems.append('NVIDIA research quorum did not pass')
+          if not active.exists() or len(json.loads(active.read_text()).get('providers', [])) < 2:
+              problems.append('active research provider manifest has fewer than two families')
+          if not battle.exists() or int(json.loads(battle.read_text()).get('selected_count', 0)) < 1:
+              problems.append('council produced no selected experiment')
+          evaluation_count = (
+              int(json.loads(evaluation.read_text()).get('selected_count', 0))
+              if evaluation.exists()
+              else 0
+          )
+          portable_count = (
+              int(json.loads(portable.read_text()).get('exported_count', 0))
+              if portable.exists()
+              else 0
+          )
+          if evaluation_count < 1 and portable_count < 1:
+              problems.append('no executable measurement or software-qualified mutation survived')
+          if problems:
+              raise SystemExit('\n'.join(problems))
+          print(
+              f'REMOTE SWARM HANDOFF QUALIFIED: measurements={evaluation_count} '
+              f'portable_mutations={portable_count}'
+          )
+          PY
