@@ -20,7 +20,12 @@ def main() -> None:
     path = Path(args.path)
     raw = path.read_bytes()
     nb = json.loads(raw)
-    text = json.dumps(nb)
+    source_text = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in nb.get("cells", [])
+        if cell.get("cell_type") == "code"
+    )
+    full_text = json.dumps(nb)
     required = (
         args.build_id,
         "Qwen3.8 27B FP8",
@@ -28,12 +33,15 @@ def main() -> None:
         "splits.public.json",
         "public_dict()",
         "arcangel-v013-public-research-split-v1",
+        "open_offline_arcade",
+        'os.environ["OPERATION_MODE"] = "OFFLINE"',
+        "ENVIRONMENTS_DIR",
         "private_blind_materialized",
         "first-tournament-scorecard.json",
         "Research tournament must not create submission.parquet",
     )
     for marker in required:
-        if marker not in text:
+        if marker not in source_text and marker not in full_text:
             raise AssertionError(f"missing tournament notebook marker: {marker}")
 
     forbidden = (
@@ -42,9 +50,12 @@ def main() -> None:
         "package_kaggle_ready.py",
         "package_promoted_swarm.py",
         "registry.write(",
+        'os.environ["OPERATION_MODE"] = "competition"',
+        'os.environ["OPERATION_MODE"] = "COMPETITION"',
+        "three.arcprize.org",
     )
     for marker in forbidden:
-        if marker in text:
+        if marker in source_text:
             raise AssertionError(f"research tournament contains forbidden authority marker: {marker}")
 
     bootstrap = "".join(nb["cells"][1]["source"])
@@ -65,6 +76,7 @@ def main() -> None:
             "scripts/run_arena_contestant.py",
             "configs/swarm-v013.json",
             "src/arc3lab/arena/first_tournament.py",
+            "src/arc3lab/arena/offline_runtime.py",
             "src/arc3lab/arena/splits.py",
             "src/arc3lab/model/server.py",
             "src/arc3lab/policy/coding.py",
@@ -74,11 +86,36 @@ def main() -> None:
         if missing:
             raise AssertionError(f"embedded tournament files missing: {missing}")
 
+        runner_handle = archive.extractfile("scripts/run_arena_contestant.py")
+        if runner_handle is None:
+            raise AssertionError("embedded arena runner is unreadable")
+        runner = runner_handle.read().decode("utf-8")
+        if "configure_offline_environment" not in runner:
+            raise AssertionError("embedded arena runner lost explicit offline configuration")
+        if 'os.environ.setdefault("OPERATION_MODE", "competition")' in runner:
+            raise AssertionError("embedded arena runner still defaults research to competition mode")
+        if 'os.environ["OPERATION_MODE"] = "competition"' in runner:
+            raise AssertionError("embedded arena runner still forces competition mode")
+
+        helper_handle = archive.extractfile("src/arc3lab/arena/offline_runtime.py")
+        if helper_handle is None:
+            raise AssertionError("embedded offline runtime helper is unreadable")
+        helper = helper_handle.read().decode("utf-8")
+        for marker in (
+            'os.environ["OPERATION_MODE"] = "OFFLINE"',
+            "OperationMode.OFFLINE",
+            "ENVIRONMENTS_DIR",
+            "metadata.json",
+        ):
+            if marker not in helper:
+                raise AssertionError(f"offline runtime helper lost required contract: {marker}")
+
     for index, cell in enumerate(nb.get("cells", [])):
         if cell.get("cell_type") == "code":
             compile("".join(cell.get("source", [])), f"cell-{index}", "exec")
 
     print("V013 RESEARCH TOURNAMENT NOTEBOOK VERIFICATION PASS")
+    print("authority=OFFLINE_LOCAL_ONLY")
     print("notebook_sha256=", hashlib.sha256(raw).hexdigest())
     print("embedded_source_sha256=", actual_sha)
     print("build_id=", args.build_id)
