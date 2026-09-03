@@ -204,18 +204,18 @@ jobs:
           --build-id CI-V013-E
       - run: >-
           python scripts/build_v013_tournament_notebook.py
-          --build-id CI-V013-TOURNAMENT
+          --build-id CI-V013-TOURNAMENT-OFFLINE
           --output /tmp/arcangel-v013-tournament.ipynb
       - run: >-
           python scripts/verify_v013_tournament_notebook.py
           /tmp/arcangel-v013-tournament.ipynb
-          --build-id CI-V013-TOURNAMENT
+          --build-id CI-V013-TOURNAMENT-OFFLINE
 
   publish-tournament-notebook:
     needs: swarm-contract
     runs-on: ubuntu-latest
     env:
-      BUILD_ID: V013-TRUTH-PHASE-BCDE-20260902
+      BUILD_ID: V013-TRUTH-PHASE-BCDE-OFFLINE-20260902
       SOURCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
@@ -233,6 +233,7 @@ jobs:
           python -m ruff check \
             src/arc3lab/arena \
             src/arc3lab/evaluation/runner.py \
+            scripts/run_arena_contestant.py \
             scripts/route_swarm_experiments.py \
             scripts/run_swarm_measurement_gpu_stage.py \
             scripts/retrying_llm_patch_worker.py \
@@ -272,17 +273,18 @@ jobs:
           if hashlib.sha256(bundle).hexdigest() != match.group(1):
               raise SystemExit('embedded source bundle hash mismatch')
           receipt = {
-              'format': 'arcangel-v013-research-tournament-notebook-v1',
+              'format': 'arcangel-v013-research-tournament-notebook-v2-offline',
               'build_id': os.environ['BUILD_ID'],
               'source_head': os.environ['SOURCE_HEAD'],
               'checkout_head': os.popen('git rev-parse HEAD').read().strip(),
               'notebook_sha256': hashlib.sha256(notebook.read_bytes()).hexdigest(),
               'embedded_source_sha256': match.group(1),
               'public_research_split_version': 'arcangel-v013-public-research-split-v1',
+              'operation_mode': 'OFFLINE',
               'private_blind_materialized': False,
               'creates_submission': False,
-              'qualification': 'tests+targeted-ruff+notebook-verifier-pass',
-              'authority': 'research-only B/C/D/E truth phase; no private BLIND and no Kaggle submission',
+              'qualification': 'tests+targeted-ruff+offline-notebook-verifier-pass',
+              'authority': 'research-only B/C/D/E truth phase; local ARC environments only; no network, private BLIND, or Kaggle submission',
           }
           if receipt['source_head'] != receipt['checkout_head']:
               raise SystemExit('published notebook checkout is not the declared exact source head')
@@ -294,7 +296,7 @@ jobs:
       - name: Upload verified tournament notebook
         uses: actions/upload-artifact@v4
         with:
-          name: arcangel-v013-research-tournament-notebook
+          name: arcangel-v013-research-tournament-notebook-offline
           retention-days: 30
           if-no-files-found: error
           path: |
