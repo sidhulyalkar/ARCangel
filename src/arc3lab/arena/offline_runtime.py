@@ -11,6 +11,10 @@ _KAGGLE_ENVIRONMENT_CANDIDATES = (
 )
 
 
+def _resolved(path: str | Path) -> Path:
+    return Path(path).expanduser().resolve(strict=False)
+
+
 def _contains_games(path: Path) -> bool:
     if not path.is_dir():
         return False
@@ -22,26 +26,26 @@ def _contains_games(path: Path) -> bool:
         return False
 
 
-def _candidate_paths(explicit: str | Path | None = None) -> Iterable[Path]:
+def _validate_authoritative_path(path: str | Path, *, source: str) -> Path:
+    resolved = _resolved(path)
+    if _contains_games(resolved):
+        return resolved
+    raise FileNotFoundError(
+        f"{source} points to an invalid ARC-AGI-3 environment directory: {resolved}. "
+        "Expected a local environment_files tree containing metadata.json."
+    )
+
+
+def _autodiscovery_candidates() -> Iterable[Path]:
     seen: set[str] = set()
 
     def emit(path: Path) -> Path | None:
-        key = str(path.expanduser().resolve(strict=False))
+        resolved = _resolved(path)
+        key = str(resolved)
         if key in seen:
             return None
         seen.add(key)
-        return Path(key)
-
-    if explicit:
-        row = emit(Path(explicit))
-        if row is not None:
-            yield row
-
-    env_value = os.getenv("ENVIRONMENTS_DIR", "").strip()
-    if env_value:
-        row = emit(Path(env_value))
-        if row is not None:
-            yield row
+        return resolved
 
     for candidate in _KAGGLE_ENVIRONMENT_CANDIDATES:
         row = emit(candidate)
@@ -65,10 +69,22 @@ def _candidate_paths(explicit: str | Path | None = None) -> Iterable[Path]:
 
 
 def discover_environment_dir(explicit: str | Path | None = None) -> Path:
-    """Resolve a local ARC-AGI-3 environment tree without contacting the network."""
+    """Resolve a local ARC-AGI-3 environment tree without contacting the network.
+
+    Explicit configuration is authoritative. If the caller passes a path, or an
+    ``ENVIRONMENTS_DIR`` value already exists, an invalid path is an error rather
+    than permission to silently evaluate against a different game tree.
+    """
+
+    if explicit:
+        return _validate_authoritative_path(explicit, source="explicit environments_dir")
+
+    env_value = os.getenv("ENVIRONMENTS_DIR", "").strip()
+    if env_value:
+        return _validate_authoritative_path(env_value, source="ENVIRONMENTS_DIR")
 
     attempted: list[str] = []
-    for candidate in _candidate_paths(explicit):
+    for candidate in _autodiscovery_candidates():
         attempted.append(str(candidate))
         if _contains_games(candidate):
             return candidate
