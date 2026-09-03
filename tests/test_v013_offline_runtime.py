@@ -43,8 +43,22 @@ def test_configure_offline_environment_overrides_competition_mode(
     assert os.environ["RECORDINGS_DIR"] == str(recordings.resolve())
 
 
-def test_discover_environment_dir_rejects_empty_directory(tmp_path: Path) -> None:
+def test_discover_environment_dir_rejects_empty_explicit_directory(tmp_path: Path) -> None:
     empty = tmp_path / "environment_files"
     empty.mkdir()
-    with pytest.raises(FileNotFoundError, match="metadata.json"):
+    with pytest.raises(FileNotFoundError, match="explicit environments_dir"):
         discover_environment_dir(empty)
+
+
+def test_invalid_environment_variable_does_not_fall_back(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    valid = _fake_environment_tree(tmp_path / "valid")
+    invalid = tmp_path / "wrong" / "environment_files"
+    invalid.mkdir(parents=True)
+    monkeypatch.setenv("ENVIRONMENTS_DIR", str(invalid))
+    monkeypatch.chdir(valid.parent)
+
+    with pytest.raises(FileNotFoundError, match="ENVIRONMENTS_DIR"):
+        discover_environment_dir()
