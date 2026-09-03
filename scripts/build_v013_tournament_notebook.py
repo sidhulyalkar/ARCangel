@@ -61,7 +61,9 @@ def _markdown(source: str) -> dict[str, object]:
 def make_notebook(*, bundle: str, source_sha: str, build_id: str) -> dict[str, object]:
     bootstrap = f'''import base64, glob, hashlib, io, os, pathlib, subprocess, sys, tarfile
 
-os.environ["OPERATION_MODE"] = "competition"
+# This artifact is a public-game research instrument, not a competition submission.
+# Fail closed into the ARC toolkit's local-only mode before importing arc_agi.
+os.environ["OPERATION_MODE"] = "OFFLINE"
 os.environ["VLLM_DISABLED_KERNELS"] = "FlashInferFP8ScaledMMLinearKernel"
 
 wheel_dirs = glob.glob("/kaggle/input/**/arc_agi_3_wheels", recursive=True)
@@ -80,11 +82,12 @@ assert hashlib.sha256(raw_bundle).hexdigest() == EMBEDDED_SOURCE_SHA256
 work = pathlib.Path("/kaggle/working/arcangel_v013_tournament")
 work.mkdir(parents=True, exist_ok=True)
 with tarfile.open(fileobj=io.BytesIO(raw_bundle), mode="r:gz") as tf:
-    tf.extractall(work)
+    tf.extractall(work, filter="data")
 sys.path.insert(0, str(work / "src"))
 os.chdir(work)
 print("ARCANGEL TOURNAMENT BUILD: {build_id}")
 print("EMBEDDED SOURCE SHA256:", EMBEDDED_SOURCE_SHA256)
+print("ARC TOOLKIT AUTHORITY: OFFLINE")
 '''
 
     runtime = '''import ctypes, glob, os, pathlib, subprocess, sys, tempfile
@@ -132,14 +135,18 @@ with tempfile.TemporaryDirectory() as td:
 print("CUDA DRIVER RUNTIME/LINKER PASS")
 '''
 
-    split = f'''import json, pathlib
-from arc_agi import Arcade
+    split = f'''import json, os, pathlib
+from arc3lab.arena.offline_runtime import open_offline_arcade
 from arc3lab.arena.splits import SplitRegistry
 
-arc = Arcade()
+recordings = pathlib.Path("/kaggle/working/arcangel_v013_research_recordings")
+arc = open_offline_arcade(recordings_dir=recordings)
+environment_dir = pathlib.Path(os.environ["ENVIRONMENTS_DIR"])
 game_ids = sorted(str(item.game_id) for item in arc.get_environments())
 if len(game_ids) < 3:
-    raise RuntimeError("Too few public environments for research split")
+    raise RuntimeError(
+        f"Too few public environments for research split: {{len(game_ids)}} from {{environment_dir}}"
+    )
 research_salt = "{PUBLIC_RESEARCH_SPLIT_SALT}"
 registry = SplitRegistry.build(game_ids, salt=research_salt, dev_fraction=0.60, validation_fraction=0.20)
 root = pathlib.Path("artifacts/arena/v013")
@@ -151,6 +158,8 @@ if private.exists():
     raise RuntimeError("Research-only notebook must not materialize private BLIND identities")
 print("PUBLIC RESEARCH SPLIT:", json.dumps({{
     "split_version": "v1",
+    "operation_mode": os.environ.get("OPERATION_MODE"),
+    "environments_dir": str(environment_dir),
     "game_count": len(game_ids),
     "dev_count": len(registry.dev),
     "validation_count": len(registry.validation),
@@ -173,7 +182,7 @@ runpy.run_path(str(runner), run_name="__main__")
 print("TOURNAMENT EXECUTION COMPLETE: {build_id}")
 '''
 
-    receipt = f'''import hashlib, json, pathlib, shutil
+    receipt = f'''import hashlib, json, os, pathlib, shutil
 
 root = pathlib.Path("artifacts/arena/v013")
 status = root / "first-tournament-status.json"
@@ -182,15 +191,19 @@ if not status.exists() or not scorecard.exists():
     raise FileNotFoundError("Tournament status/scorecard missing")
 if (root / "splits.private.json").exists():
     raise RuntimeError("Private BLIND registry unexpectedly exists")
+if os.environ.get("OPERATION_MODE") != "OFFLINE":
+    raise RuntimeError("Research tournament escaped OFFLINE operation mode")
 summary = {{
     "build_id": "{build_id}",
     "embedded_source_sha256": "{source_sha}",
     "public_research_split_version": "v1",
+    "operation_mode": os.environ.get("OPERATION_MODE"),
+    "environments_dir": os.environ.get("ENVIRONMENTS_DIR", ""),
     "status": json.loads(status.read_text(encoding="utf-8")),
     "scorecard_sha256": hashlib.sha256(scorecard.read_bytes()).hexdigest(),
     "private_blind_materialized": False,
     "submission_created": pathlib.Path("/kaggle/working/submission.parquet").exists(),
-    "authority": "research-only B/C/D/E tournament; no private BLIND and no Kaggle submission",
+    "authority": "research-only B/C/D/E tournament; local ARC environments only; no private BLIND and no Kaggle submission",
 }}
 if summary["submission_created"]:
     raise RuntimeError("Research tournament must not create submission.parquet")
@@ -205,11 +218,12 @@ print(json.dumps(summary, indent=2))
         "cells": [
             _markdown(
                 f"# ARCangel V013 Research Tournament | {build_id}\n\n"
-                "Research-only adaptive B/C/D/E architecture tournament. It uses a stable versioned "
-                "public DEV/VALIDATION split across code revisions, reserves a research-only holdout, "
-                "runs one shared Qwen3.8 27B FP8 server, and exports scorecard/status artifacts. The "
-                "true private BLIND registry is separate and is not materialized here. **This notebook "
-                "does not create a Kaggle submission.**\n\n"
+                "Research-only adaptive B/C/D/E architecture tournament. It runs the attached public "
+                "ARC environment files in explicit OFFLINE mode, uses a stable versioned DEV/VALIDATION "
+                "split across code revisions, reserves a research-only holdout, runs one shared Qwen3.8 "
+                "27B FP8 server, and exports scorecard/status artifacts. The true private BLIND registry "
+                "is separate and is not materialized here. **This notebook does not create a Kaggle "
+                "submission and makes no ARC network request.**\n\n"
                 "Kaggle settings: RTX PRO 6000, Internet OFF. Attach ARC Prize 2026, ARC3 vLLM H100 "
                 "Wheelhouse V3, and Qwen3.8 27B FP8 Repacked."
             ),
@@ -230,7 +244,7 @@ print(json.dumps(summary, indent=2))
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Build deterministic V013 research tournament notebook")
-    ap.add_argument("--build-id", default="V013-TRUTH-PHASE-BCDE-20260902")
+    ap.add_argument("--build-id", default="V013-TRUTH-PHASE-BCDE-OFFLINE-20260902")
     ap.add_argument("--output", default="kaggle/ARCangel_V013_Research_Tournament_Qwen38.ipynb")
     args = ap.parse_args()
 
